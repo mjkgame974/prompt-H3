@@ -1,0 +1,6 @@
+{
+  "name": "Assistant Prompting MiniMax H3",
+  "description": "Assistant expert de création de prompts vidéo MiniMax H3 avec validation métier et génération automatique.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
