@@ -16,7 +16,7 @@ export type VideoGoal =
 
 export type AspectRatio = "16:9" | "9:16" | "1:1" | "4:3" | "21:9";
 
-export type VideoDuration = "5s" | "6s" | "10s" | "15s";
+export type VideoDuration = "5s" | "10s" | "15s" | "30s";
 
 export type ReferenceRole =
   | "ambiance"
@@ -126,6 +126,7 @@ export interface StyleContract {
   palette: string; // Ex: "warm amber and teal", "monochrome neon"
   era: string; // Ex: "1980s retro", "contemporary luxury"
   visualRendering: string; // Ex: "ultra-realistic photorealistic render"
+  fps?: string; // Ex: "24 FPS", "60 FPS", "12-24 FPS" — frame rate cible
   condensedEnglishSentence: string; // Phrase unique générée en anglais
 }
 

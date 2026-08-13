@@ -176,6 +176,7 @@ function ensureProjectDataDefaults(data: any): ProjectData {
       visualRendering:
         data.styleContract?.visualRendering ||
         INITIAL_PROJECT_DATA.styleContract.visualRendering,
+      fps: data.styleContract?.fps || INITIAL_PROJECT_DATA.styleContract.fps,
       condensedEnglishSentence:
         data.styleContract?.condensedEnglishSentence ||
         data.styleContract?.condensedEnglish ||

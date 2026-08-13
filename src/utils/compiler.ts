@@ -90,8 +90,12 @@ export function compileBlockStructured(data: ProjectData): StructuredPromptBlock
   const styleContractBlock =
     data.styleContract.condensedEnglishSentence &&
     data.styleContract.condensedEnglishSentence.trim() !== ""
-      ? `[STYLE CONTRACT]\n${data.styleContract.condensedEnglishSentence.trim()}`
-      : `[STYLE CONTRACT]\n${data.styleContract.medium}, ${data.styleContract.texture}, ${data.styleContract.palette}, ${data.styleContract.era}, ${data.styleContract.visualRendering}.`;
+      ? `[STYLE CONTRACT]\n${data.styleContract.condensedEnglishSentence.trim()}${
+          data.styleContract.fps ? `\nFrame Rate: ${data.styleContract.fps}` : ""
+        }`
+      : `[STYLE CONTRACT]\n${data.styleContract.medium}, ${data.styleContract.texture}, ${data.styleContract.palette}, ${data.styleContract.era}, ${data.styleContract.visualRendering}${
+          data.styleContract.fps ? `, ${data.styleContract.fps}` : ""
+        }.`;
 
   // 2. Timeline & Camera Combined Block (H3 Order)
   const timelineLines: string[] = [];
@@ -253,15 +257,18 @@ export function compileFrenchPrompt(data: ProjectData): string {
 export function compileBlockStructuredFrench(data: ProjectData): StructuredPromptBlocks {
   // 1. Style Contract (in French)
   const hasCondensed = data.styleContract.condensedEnglishSentence?.trim();
+  const fpsLine = data.styleContract.fps
+    ? `\nCadence (FPS) : ${data.styleContract.fps}`
+    : "";
   const styleContractBlock = hasCondensed
-    ? `[CONTRAT DE STYLE]\n${hasCondensed}\n\n(Même phrase utilisée en anglais dans le prompt final H3)`
+    ? `[CONTRAT DE STYLE]\n${hasCondensed}${fpsLine}\n\n(Même phrase utilisée en anglais dans le prompt final H3)`
     : data.styleContract.medium || data.styleContract.texture || data.styleContract.palette || data.styleContract.era
     ? `[CONTRAT DE STYLE]\n` +
       `Medium : ${data.styleContract.medium || "(non renseigné)"}\n` +
       `Texture : ${data.styleContract.texture || "(non renseigné)"}\n` +
       `Palette : ${data.styleContract.palette || "(non renseigné)"}\n` +
       `Époque : ${data.styleContract.era || "(non renseigné)"}\n` +
-      `Rendu visuel : ${data.styleContract.visualRendering || "(non renseigné)"}`
+      `Rendu visuel : ${data.styleContract.visualRendering || "(non renseigné)"}${fpsLine}`
     : `[CONTRAT DE STYLE]\n(Aucun style défini. Rendez-vous à l'étape 2 pour le configurer.)`;
 
   // 2. Timeline & Camera Combined Block (in French)

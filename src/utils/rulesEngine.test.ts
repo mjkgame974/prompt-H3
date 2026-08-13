@@ -46,7 +46,7 @@ describe("validateProjectData", () => {
     expect(issues.some((i) => i.id === "err_shot_count_10s")).toBe(true);
   });
 
-  it("flags a 5s/6s video with more than 2 shots", () => {
+  it("flags a 5s video with more than 2 shots", () => {
     const issues = validateProjectData({
       ...short5sProject,
       shots: [
@@ -56,6 +56,37 @@ describe("validateProjectData", () => {
       ],
     });
     expect(issues.some((i) => i.id === "err_shot_count_5s")).toBe(true);
+  });
+
+  it("does NOT flag a 15s video for shot count (long-form is flexible)", () => {
+    // 15s and 30s videos don't have a strict shot count limit — let the user decide.
+    const issues = validateProjectData({
+      ...validPerfumeProject,
+      duration: "15s",
+      shots: [
+        { id: "s1", shotNumber: 1, visualDescription: "x", subjectAction: "x", atmosphere: "x" },
+        { id: "s2", shotNumber: 2, visualDescription: "x", subjectAction: "x", atmosphere: "x" },
+        { id: "s3", shotNumber: 3, visualDescription: "x", subjectAction: "x", atmosphere: "x" },
+        { id: "s4", shotNumber: 4, visualDescription: "x", subjectAction: "x", atmosphere: "x" },
+        { id: "s5", shotNumber: 5, visualDescription: "x", subjectAction: "x", atmosphere: "x" },
+      ],
+    });
+    expect(issues.some((i) => i.id === "err_shot_count_5s" || i.id === "err_shot_count_10s")).toBe(false);
+  });
+
+  it("does NOT flag a 30s video for shot count", () => {
+    const issues = validateProjectData({
+      ...validPerfumeProject,
+      duration: "30s",
+      shots: [
+        { id: "s1", shotNumber: 1, visualDescription: "x", subjectAction: "x", atmosphere: "x" },
+        { id: "s2", shotNumber: 2, visualDescription: "x", subjectAction: "x", atmosphere: "x" },
+        { id: "s3", shotNumber: 3, visualDescription: "x", subjectAction: "x", atmosphere: "x" },
+        { id: "s4", shotNumber: 4, visualDescription: "x", subjectAction: "x", atmosphere: "x" },
+        { id: "s5", shotNumber: 5, visualDescription: "x", subjectAction: "x", atmosphere: "x" },
+      ],
+    });
+    expect(issues.some((i) => i.id === "err_shot_count_5s" || i.id === "err_shot_count_10s")).toBe(false);
   });
 
   it("flags a timestamp on Shot 1 (it must be implicit at 00:00.000)", () => {

@@ -3,6 +3,10 @@ import { PresetTemplate, ProjectData } from "../types/minimax";
 export interface StylePreset {
   id: string;
   name: string;
+  /** Short tagline shown next to the preset (e.g. "24 FPS — anamorphic film") */
+  tagline: string;
+  /** Frame rate cible (e.g. "24 FPS", "60 FPS", "12-24 FPS") */
+  fps: string;
   medium: string;
   texture: string;
   palette: string;
@@ -14,59 +18,94 @@ export interface StylePreset {
 
 export const STYLE_PRESETS: StylePreset[] = [
   {
-    id: "cinematic_35mm",
-    name: "35mm Cinématique",
+    id: "cinematic_film",
+    name: "Cinématique / Film 35mm",
+    tagline: "24 FPS — standard cinéma avec flou de mouvement naturel",
+    fps: "24 FPS",
     medium: "35mm analog film shot on anamorphic lens",
-    texture: "fine organic film grain, soft cinematic blooming highlights",
-    palette: "warm amber, deep teal, rich shadows",
+    texture: "fine organic film grain, soft cinematic blooming highlights, natural motion blur",
+    palette: "warm amber, deep teal, rich shadows, color graded",
     era: "contemporary high-end cinema",
-    visualRendering: "ultra-photorealistic 8k movie render",
-    condensedEnglish: "Cinematic 35mm analog film shot on anamorphic lens, fine organic film grain with blooming highlights, warm amber and deep teal palette, contemporary high-end cinema, ultra-photorealistic 8k movie render.",
+    visualRendering:
+      "ultra-photorealistic 8k movie render, 24fps cinematic motion blur, shallow depth of field",
+    condensedEnglish:
+      "Cinematic 35mm analog film shot on anamorphic lens, 24fps film motion blur, fine organic film grain with blooming highlights, warm amber and deep teal color graded palette, shallow depth of field, contemporary high-end cinema, ultra-photorealistic 8k movie render.",
     previewColor: "from-amber-600 to-cyan-900",
   },
   {
-    id: "luxury_product",
-    name: "Studio Produit Luxe",
-    medium: "Macro studio commercial camera",
-    texture: "flawless metallic sheen, razor-sharp focus, liquid refraction",
-    palette: "gold, obsidian black, crisp silver accent",
-    era: "modern premium luxury advertisement",
-    visualRendering: "photorealistic studio lighting with raytraced reflections",
-    condensedEnglish: "Macro studio commercial camera, flawless metallic sheen with razor-sharp focus and liquid refraction, gold and obsidian black palette, modern premium luxury advertisement, photorealistic studio lighting with raytraced reflections.",
-    previewColor: "from-amber-400 to-stone-900",
+    id: "hyper_realistic_hd",
+    name: "Hyper-Réaliste / Documentaire HD",
+    tagline: "30-60 FPS — détail extrême caméra numérique ou sport/action",
+    fps: "60 FPS",
+    medium: "High-definition digital cinema camera (RED-style sensor)",
+    texture: "ultra-detailed photorealistic textures, no stylization, no grain",
+    palette: "natural lighting, true-to-life color science, neutral whites",
+    era: "contemporary ultra-HD documentary / sports / action footage",
+    visualRendering:
+      "photorealistic 8k resolution, 60fps ultra-smooth movement, ultra-detailed textures, studio lighting",
+    condensedEnglish:
+      "Hyper-realistic digital cinema, 60fps ultra-smooth movement, 8k resolution, ultra-detailed photorealistic textures, shot on RED camera, studio lighting, natural true-to-life palette, contemporary ultra-HD documentary aesthetic.",
+    previewColor: "from-slate-700 to-emerald-800",
   },
   {
-    id: "anime_2d",
-    name: "Animation 2D High-Detail",
-    medium: "Hand-drawn 2D digital anime artwork",
-    texture: "crisp cell shading, painterly watercolor background, vivid lineart",
-    palette: "vibrant pastel blues, sunset pinks and deep indigo",
-    era: "modern anime film aesthetic",
-    visualRendering: "high-budget theatrical anime animation render",
-    condensedEnglish: "Hand-drawn 2D digital anime artwork, crisp cell shading with painterly watercolor background, vibrant pastel blues and sunset pinks, modern anime film aesthetic, high-budget theatrical anime animation render.",
+    id: "3d_animation_pixar",
+    name: "Animation 3D / Style Pixar",
+    tagline: "24-60 FPS — animation 3D long-métrage ou rendu cinématique de jeu",
+    fps: "24 FPS",
+    medium: "3D computer animation, Pixar-style character render",
+    texture: "soft subsurface scattering, stylized cartoon shading, smooth surfaces",
+    palette: "vibrant saturated colors, expressive lighting, colorful shadows",
+    era: "modern theatrical 3D animation",
+    visualRendering:
+      "ray-traced 3D render, 24fps cinematic animation, Pixar style, stylized characters, octane render quality",
+    condensedEnglish:
+      "3D animation Pixar style, 24fps cinematic render, soft subsurface scattering, stylized cartoon shading, vibrant saturated palette, expressive colorful lighting, ray tracing, modern theatrical 3D animation, Unreal Engine 5 quality.",
+    previewColor: "from-sky-500 to-pink-500",
+  },
+  {
+    id: "anime_manga",
+    name: "Anime / Animation Japonaise",
+    tagline: "12-24 FPS — animation traditionnelle « on twos » style Ghibli",
+    fps: "12 FPS",
+    medium: "2D hand-drawn anime, cel-shaded, manga-inspired lineart",
+    texture: "crisp cell shading, painterly watercolor background, vivid expressive lineart",
+    palette: "vibrant anime colors, expressive lighting, dramatic contrasts",
+    era: "modern anime film aesthetic, Studio Ghibli inspired",
+    visualRendering:
+      "12fps hand-drawn animation on twos, 2D cel shading, Studio Ghibli aesthetic, vibrant anime colors",
+    condensedEnglish:
+      "Anime style 2D hand-drawn animation, 12fps on twos for traditional hand-drawn feel, Studio Ghibli aesthetic, crisp cel shading, vivid lineart, vibrant anime palette, painterly watercolor background, modern anime film aesthetic.",
     previewColor: "from-indigo-500 to-rose-400",
   },
   {
-    id: "retro_vhs_90s",
-    name: "Rétro VHS 90s",
-    medium: "1990s magnetic tape camcorder video",
-    texture: "scanlines, subtle tape distortion, soft chromatic aberration",
-    palette: "saturated neon magentas, electric cyan, grainy darks",
-    era: "1990s retro nostalgic vibe",
-    visualRendering: "authentic vintage analog VHS capture",
-    condensedEnglish: "1990s magnetic tape camcorder video, scanlines and subtle tape distortion with chromatic aberration, saturated neon magenta and electric cyan, 1990s retro nostalgic vibe, authentic vintage analog VHS capture.",
+    id: "cyberpunk_retro",
+    name: "Cyberpunk / Rétro-Futuriste",
+    tagline: "24-30 FPS — dystopie néon, brume et reflets nocturnes",
+    fps: "24 FPS",
+    medium: "Digital cinema camera, neon-saturated grading",
+    texture: "atmospheric fog, wet pavement glisten, chromatic aberration, light bloom",
+    palette: "saturated neon magenta, electric cyan, deep dark blues, accent hot pink",
+    era: "near-future dystopian retro-futurism",
+    visualRendering:
+      "24fps cinematic, synthwave aesthetic, neon lighting, dark rainy streets, glowing reflections",
+    condensedEnglish:
+      "Cyberpunk retro-futuriste, 24fps cinematic motion, neon-saturated lighting, dark rainy streets, atmospheric fog and wet pavement glisten, synthwave aesthetic, glowing reflections, futuristic city, deep dark blues with magenta and cyan accents.",
     previewColor: "from-fuchsia-600 to-cyan-500",
   },
   {
-    id: "dark_thriller_noir",
-    name: "Dark Noir / Thriller",
-    medium: "Digital cinema camera with low-light sensor",
-    texture: "heavy atmospheric fog, wet pavement glisten, moody grain",
-    palette: "desaturated icy blue, deep charcoal, single warm street light key",
-    era: "neo-noir contemporary mystery",
-    visualRendering: "dramatic high-contrast chiaroscuro lighting",
-    condensedEnglish: "Digital cinema camera with low-light sensor, heavy atmospheric fog and wet pavement glisten, desaturated icy blue and charcoal palette with warm key light, neo-noir contemporary mystery, dramatic high-contrast chiaroscuro lighting.",
-    previewColor: "from-slate-900 to-blue-950",
+    id: "stop_motion_clay",
+    name: "Stop-Motion / Claymation",
+    tagline: "12 FPS — animation image par image, pâte à modeler ou papier découpé",
+    fps: "12 FPS",
+    medium: "Stop-motion frame-by-frame, claymation or paper-cutout puppets",
+    texture: "handcrafted tactile feel, slight frame jitter, fingerprint textures",
+    palette: "warm nostalgic colors, crafted lighting, handpainted backgrounds",
+    era: "classic stop-motion animation, Aardman / Laika studio aesthetic",
+    visualRendering:
+      "12fps choppy frame rate, claymation style, handcrafted texture, tactile feel, frame-by-frame puppet animation",
+    condensedEnglish:
+      "Stop-motion animation, 12fps choppy frame rate, claymation style, handcrafted tactile texture, slight frame jitter, warm nostalgic palette, crafted lighting, handpainted backgrounds, puppet animation, Aardman / Laika studio aesthetic.",
+    previewColor: "from-orange-500 to-amber-700",
   },
 ];
 

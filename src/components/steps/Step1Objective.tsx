@@ -26,7 +26,7 @@ const VIDEO_GOALS: { id: VideoGoal; label: string }[] = [
 ];
 
 const ASPECT_RATIOS: AspectRatio[] = ["16:9", "9:16", "1:1", "4:3", "21:9"];
-const DURATIONS: VideoDuration[] = ["5s", "6s", "10s", "15s"];
+const DURATIONS: VideoDuration[] = ["5s", "10s", "15s", "30s"];
 
 export const Step1Objective: React.FC<Step1ObjectiveProps> = ({
   project,
@@ -160,7 +160,7 @@ export const Step1Objective: React.FC<Step1ObjectiveProps> = ({
         <div className="space-y-2">
           <label className="block text-xs font-semibold text-slate-300 flex items-center space-x-1.5">
             <Clock className="w-3.5 h-3.5 text-amber-400" />
-            <span>Durée Cible (Recommandé : 10s pour H3)</span>
+            <span>Durée Cible (5s · 10s · 15s · 30s)</span>
           </label>
           <div className="flex gap-2">
             {DURATIONS.map((dur) => {

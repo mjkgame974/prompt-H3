@@ -35,6 +35,7 @@ export const Step2StyleContract: React.FC<Step2StyleContractProps> = ({
       palette: preset.palette,
       era: preset.era,
       visualRendering: preset.visualRendering,
+      fps: preset.fps,
       condensedEnglishSentence: preset.condensedEnglish,
     });
   };
@@ -84,8 +85,11 @@ export const Step2StyleContract: React.FC<Step2StyleContractProps> = ({
                   <span className="font-bold text-xs">{preset.name}</span>
                   {isSelected && <Check className="w-4 h-4 text-amber-400" />}
                 </div>
-                <p className="text-[11px] text-slate-500 mt-2 line-clamp-2">
-                  {preset.condensedEnglish}
+                <p className="text-[10px] font-mono text-amber-400/80 mt-1">
+                  🎞️ {preset.fps}
+                </p>
+                <p className="text-[11px] text-slate-500 mt-1.5 line-clamp-2 italic">
+                  {preset.tagline}
                 </p>
               </button>
             );
@@ -161,6 +165,23 @@ export const Step2StyleContract: React.FC<Step2StyleContractProps> = ({
             value={style.visualRendering}
             onChange={(e) => updateField("visualRendering", e.target.value)}
             placeholder="Ex: photorealistic studio lighting with raytraced reflections"
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-amber-500 focus:outline-none transition"
+          />
+        </div>
+
+        {/* FPS */}
+        <div className="space-y-1.5 sm:col-span-2">
+          <label className="block text-xs font-semibold text-slate-300 flex items-center space-x-1.5">
+            <span>6. Cadence d'Images (Frame Rate)</span>
+            <span className="text-[10px] text-slate-500 font-normal">
+              — anime le mouvement selon l'esthétique choisie
+            </span>
+          </label>
+          <input
+            type="text"
+            value={style.fps || ""}
+            onChange={(e) => onChange({ ...style, fps: e.target.value })}
+            placeholder="Ex: 24 FPS (cinéma) · 30 FPS (vidéo) · 60 FPS (smooth) · 12-24 FPS (anime/manga)"
             className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-amber-500 focus:outline-none transition"
           />
         </div>

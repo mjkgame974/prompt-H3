@@ -20,15 +20,15 @@ export function validateProjectData(data: ProjectData): ValidationIssue[] {
         "MiniMax H3 recommande un maximum de 2 à 3 moments sur une vidéo de 10 secondes pour éviter les saccades ou coupures brutales.",
       fixActionLabel: "Conserver seulement les 3 meilleurs plans",
     });
-  } else if ((data.duration === "5s" || data.duration === "6s") && shotCount > 2) {
+  } else if (data.duration === "5s" && shotCount > 2) {
     issues.push({
       id: "err_shot_count_5s",
       step: 4,
       field: "shots",
       severity: "warning",
-      title: "Trop de plans pour une vidéo courte (5-6s)",
+      title: "Trop de plans pour une vidéo de 5 secondes",
       message:
-        "Sur 5 ou 6 secondes, limitez-vous idéalement à 1 ou 2 plans maximum pour laisser le temps au modèle de développer l'action.",
+        "Sur 5 secondes, limitez-vous idéalement à 1 ou 2 plans maximum pour laisser le temps au modèle de développer l'action.",
       fixActionLabel: "Réduire à 2 plans max",
     });
   }

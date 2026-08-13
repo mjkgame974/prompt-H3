@@ -81,6 +81,23 @@ describe("compileMiniMaxH3Prompt", () => {
     expect(prompt).toContain("no plastic look, no pixelated artifacts, no slow motion");
   });
 
+  it("includes the frame rate in the [STYLE CONTRACT] block when set", () => {
+    const prompt = compileMiniMaxH3Prompt({
+      ...validPerfumeProject,
+      styleContract: { ...validPerfumeProject.styleContract, fps: "24 FPS" },
+    });
+    expect(prompt).toContain("[STYLE CONTRACT]");
+    expect(prompt).toContain("Frame Rate: 24 FPS");
+  });
+
+  it("omits the Frame Rate line when fps is empty", () => {
+    const prompt = compileMiniMaxH3Prompt({
+      ...validPerfumeProject,
+      styleContract: { ...validPerfumeProject.styleContract, fps: "" },
+    });
+    expect(prompt).not.toContain("Frame Rate:");
+  });
+
   it("includes camera framing/angle/motion/speed for every shot", () => {
     const prompt = compileMiniMaxH3Prompt(validPerfumeProject);
     expect(prompt).toContain("Camera: Medium shot, Low angle shot, Tracking shot forward");
@@ -181,6 +198,14 @@ describe("compileBlockStructured", () => {
     });
     expect(blocks.preservationBlock).toContain("Preserve key subject details");
   });
+
+  it("includes Frame Rate in the English style contract block when fps is set", () => {
+    const blocks = compileBlockStructured({
+      ...validPerfumeProject,
+      styleContract: { ...validPerfumeProject.styleContract, fps: "60 FPS" },
+    });
+    expect(blocks.styleContractBlock).toContain("Frame Rate: 60 FPS");
+  });
 });
 
 describe("compileFrenchPrompt", () => {
@@ -260,6 +285,14 @@ describe("compileFrenchPrompt", () => {
       ],
     });
     expect(prompt).toContain("no plastic look, no pixelated artifacts, no slow motion");
+  });
+
+  it("includes Cadence (FPS) in the French style contract block when fps is set", () => {
+    const prompt = compileFrenchPrompt({
+      ...validPerfumeProject,
+      styleContract: { ...validPerfumeProject.styleContract, fps: "12 FPS" },
+    });
+    expect(prompt).toContain("Cadence (FPS) : 12 FPS");
   });
 });
 
