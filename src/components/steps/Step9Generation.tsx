@@ -17,6 +17,7 @@ import {
   Image as ImageIcon,
   ShieldCheck,
   RefreshCw,
+  Eye,
 } from "lucide-react";
 import { ProjectData, ValidationIssue } from "../../types/minimax";
 import {
@@ -24,7 +25,6 @@ import {
   compileBlockStructured,
   compileMiniMaxH3Prompt,
   compileFrenchPrompt,
-  compileBlockStructuredFrench,
 } from "../../utils/compiler";
 import { ExportProjectButton } from "../ExportProjectButton";
 
@@ -38,6 +38,8 @@ interface Step9GenerationProps {
   onSelectFileForImport: (file: File) => void;
 }
 
+type Tab = "mixte" | "5s" | "blocks";
+
 export const Step9Generation: React.FC<Step9GenerationProps> = ({
   project,
   issues = [],
@@ -50,14 +52,13 @@ export const Step9Generation: React.FC<Step9GenerationProps> = ({
   const [copiedFull, setCopiedFull] = useState(false);
   const [copied5s, setCopied5s] = useState(false);
   const [copiedFr, setCopiedFr] = useState(false);
-  const [activeTab, setActiveTab] = useState<"full" | "5s" | "blocks" | "fr">("full");
+  const [activeTab, setActiveTab] = useState<Tab>("mixte");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fullPrompt = project.optimizedPrompt || compileMiniMaxH3Prompt(project);
   const test5sPrompt = compile5sTestPrompt(project);
   const blocks = compileBlockStructured(project);
   const frenchPrompt = compileFrenchPrompt(project);
-  const blocksFr = compileBlockStructuredFrench(project);
 
   const handleCopyFull = () => {
     navigator.clipboard.writeText(fullPrompt);
@@ -122,7 +123,9 @@ export const Step9Generation: React.FC<Step9GenerationProps> = ({
               Étape 9 — Génération & Export du Prompt Final MiniMax H3
             </h3>
             <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-              Votre prompt final en anglais est prêt, parfaitement assemblé et structuré selon le cahier des charges MiniMax H3. Copiez-le directement ou sauvegardez l'intégralité du projet en JSON local.
+              L'onglet par défaut te montre le prompt en <strong>français</strong> (pour relire
+              et comprendre) à côté de la version <strong>anglaise H3</strong> (à copier-coller
+              dans MiniMax H3). Chaque version a son propre bouton "Copier".
             </p>
           </div>
         </div>
@@ -133,14 +136,15 @@ export const Step9Generation: React.FC<Step9GenerationProps> = ({
         {/* Tab Switcher */}
         <div className="flex items-center space-x-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs">
           <button
-            onClick={() => setActiveTab("full")}
-            className={`px-3 py-1.5 rounded-lg font-bold transition ${
-              activeTab === "full"
+            onClick={() => setActiveTab("mixte")}
+            className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center space-x-1.5 ${
+              activeTab === "mixte"
                 ? "bg-amber-500 text-slate-950 shadow-sm"
                 : "text-slate-400 hover:text-slate-200"
             }`}
           >
-            Prompt Complet (10s)
+            <Eye className="w-3.5 h-3.5" />
+            <span>🇫🇷 + 🇬🇧 Vue Mixte</span>
           </button>
 
           <button
@@ -152,7 +156,7 @@ export const Step9Generation: React.FC<Step9GenerationProps> = ({
             }`}
           >
             <Zap className="w-3.5 h-3.5" />
-            <span>Version Test 5s</span>
+            <span>Test 5s</span>
           </button>
 
           <button
@@ -165,23 +169,12 @@ export const Step9Generation: React.FC<Step9GenerationProps> = ({
           >
             Vue Structurée
           </button>
-
-          <button
-            onClick={() => setActiveTab("fr")}
-            className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center space-x-1 ${
-              activeTab === "fr"
-                ? "bg-amber-500 text-slate-950 shadow-sm"
-                : "text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            <span>🇫🇷</span>
-            <span>Vue Française</span>
-          </button>
         </div>
 
         {/* AI & Export Actions */}
         <div className="flex items-center space-x-2">
           <button
+            type="button"
             onClick={onOptimizeWithAi}
             disabled={isOptimizing}
             className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-md disabled:opacity-50 transition"
@@ -193,6 +186,7 @@ export const Step9Generation: React.FC<Step9GenerationProps> = ({
           <ExportProjectButton project={project} variant="secondary" label="Sauvegarder JSON" />
 
           <button
+            type="button"
             onClick={handleDownloadTxt}
             className="inline-flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
           >
@@ -202,37 +196,86 @@ export const Step9Generation: React.FC<Step9GenerationProps> = ({
         </div>
       </div>
 
-      {/* Main Display Container */}
-      {activeTab === "full" && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-              Prompt Final Anglais Prêt pour Copier-Coller (Full 10s)
-            </label>
-            <button
-              onClick={handleCopyFull}
-              className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-lg shadow-amber-500/20 transition active:scale-95"
-            >
-              {copiedFull ? (
-                <>
-                  <Check className="w-4 h-4" />
-                  <span>Prompt Copié !</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-4 h-4" />
-                  <span>Copier le Prompt Final</span>
-                </>
-              )}
-            </button>
+      {/* Default tab: side-by-side French + English */}
+      {activeTab === "mixte" && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* ── French pane (read-only, blue) ── */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-blue-300 uppercase tracking-wider flex items-center space-x-1.5">
+                  <span>🇫🇷</span>
+                  <span>Version Française (lecture)</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={handleCopyFr}
+                  className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white shadow-md shadow-blue-500/20 transition active:scale-95"
+                >
+                  {copiedFr ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Copié !</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Copier FR</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              <div className="p-5 bg-slate-950 border border-blue-500/30 rounded-2xl font-sans text-sm text-slate-100 whitespace-pre-wrap leading-relaxed select-all max-h-[640px] overflow-y-auto">
+                {frenchPrompt}
+              </div>
+            </div>
+
+            {/* ── English pane (H3 spec, copy this, amber) ── */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center space-x-1.5">
+                  <span>🇬🇧</span>
+                  <span>Version Anglaise H3 (copier-coller)</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={handleCopyFull}
+                  className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-md shadow-amber-500/20 transition active:scale-95"
+                >
+                  {copiedFull ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Copié !</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Copier EN</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              <div className="p-5 bg-slate-950 border border-amber-500/30 rounded-2xl font-mono text-xs text-slate-100 whitespace-pre-wrap leading-relaxed select-all max-h-[640px] overflow-y-auto">
+                {fullPrompt}
+              </div>
+            </div>
           </div>
 
-          <div className="p-5 bg-slate-950 border border-slate-800 rounded-2xl font-mono text-xs text-slate-100 whitespace-pre-wrap leading-relaxed select-all">
-            {fullPrompt}
+          {/* Helper banner */}
+          <div className="p-4 bg-blue-950/30 border border-blue-800/50 rounded-xl text-xs text-blue-200 leading-relaxed">
+            <strong>💡 Mode d'emploi :</strong> lis la colonne de gauche pour vérifier ton intention
+            (en français, c'est ton texte). Une fois satisfait, clique sur <span className="font-bold">« Copier EN »</span> à
+            droite pour récupérer la version formatée H3, prête à coller dans MiniMax H3.
+            <br />
+            <span className="text-[10px] text-slate-400 italic">
+              Note : le dictionnaire de traduction FR→EN intégré est limité. Pour une traduction
+              complète de tes champs en français vers l'anglais H3, on peut brancher Gemini (reporté).
+            </span>
           </div>
         </div>
       )}
 
+      {/* 5s Test Prompt */}
       {activeTab === "5s" && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -241,6 +284,7 @@ export const Step9Generation: React.FC<Step9GenerationProps> = ({
               <span>Version Test 5s Économique (Pour Validation Rapide)</span>
             </label>
             <button
+              type="button"
               onClick={handleCopy5s}
               className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md transition"
             >
@@ -264,6 +308,7 @@ export const Step9Generation: React.FC<Step9GenerationProps> = ({
         </div>
       )}
 
+      {/* Structured blocks */}
       {activeTab === "blocks" && (
         <div className="space-y-3 font-mono text-xs text-slate-200">
           <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-1">
@@ -306,44 +351,6 @@ export const Step9Generation: React.FC<Step9GenerationProps> = ({
               6. LISTE NÉGATIVE (3-6 ITEMS)
             </span>
             <p className="text-slate-200">{blocks.negativeConstraintsBlock}</p>
-          </div>
-        </div>
-      )}
-
-      {activeTab === "fr" && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center space-x-1.5">
-              <span>🇫🇷</span>
-              <span>Version Française (lecture — pour comprendre ce qui sera envoyé à H3)</span>
-            </label>
-            <button
-              onClick={handleCopyFr}
-              className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white shadow-lg shadow-blue-500/20 transition active:scale-95"
-            >
-              {copiedFr ? (
-                <>
-                  <Check className="w-4 h-4" />
-                  <span>Copié !</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-4 h-4" />
-                  <span>Copier la version FR</span>
-                </>
-              )}
-            </button>
-          </div>
-
-          <div className="p-5 bg-slate-950 border border-blue-500/30 rounded-2xl font-sans text-sm text-slate-100 whitespace-pre-wrap leading-relaxed select-all">
-            {frenchPrompt}
-          </div>
-
-          <div className="p-4 bg-blue-950/30 border border-blue-800/50 rounded-xl text-xs text-blue-200 leading-relaxed">
-            <strong>💡 Astuce :</strong> l'onglet <span className="font-bold">« Prompt Complet (10s) »</span> contient
-            la version anglaise, formatée selon le cahier des charges MiniMax H3 — c'est celle à copier-coller
-            dans ton interface de génération. Cet onglet FR est là pour que tu puisses relire et comprendre
-            ce que tu vas envoyer au modèle, en français.
           </div>
         </div>
       )}
@@ -425,6 +432,7 @@ export const Step9Generation: React.FC<Step9GenerationProps> = ({
             className="hidden"
           />
           <button
+            type="button"
             onClick={() => fileInputRef.current?.click()}
             className="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
           >

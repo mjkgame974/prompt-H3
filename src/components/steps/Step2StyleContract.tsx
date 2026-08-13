@@ -28,6 +28,35 @@ export const Step2StyleContract: React.FC<Step2StyleContractProps> = ({
     onChange(updated);
   };
 
+  /**
+   * Update the FPS field. Unlike a generic text field, the FPS is also embedded
+   * inside the preset's condensedEnglishSentence (e.g. "…24fps cinematic render…"),
+   * so we need to keep that string in sync to avoid a contradictory prompt
+   * (where the sentence says one FPS and the "Frame Rate" line says another).
+   */
+  const updateFps = (newFps: string) => {
+    const updated = { ...style, fps: newFps };
+    if (updated.condensedEnglishSentence) {
+      if (newFps) {
+        // Replace any "<n>fps" or "<n>-<m> FPS" pattern with the new value.
+        updated.condensedEnglishSentence = updated.condensedEnglishSentence.replace(
+          /\b\d+(?:-\d+)?\s*fps\b/gi,
+          newFps
+        );
+      } else {
+        // Remove the FPS chunk entirely (e.g. ", 24fps" or " 12-24 FPS")
+        // and clean up any leftover empty separator before the next clause.
+        updated.condensedEnglishSentence = updated.condensedEnglishSentence
+          .replace(/,?\s*\b\d+(?:-\d+)?\s*fps\b/gi, "")
+          .replace(/,\s*,/g, ",")
+          .replace(/,\s*\./g, ".")
+          .replace(/\s{2,}/g, " ")
+          .trim();
+      }
+    }
+    onChange(updated);
+  };
+
   const applyPreset = (preset: StylePreset) => {
     onChange({
       medium: preset.medium,
@@ -180,7 +209,7 @@ export const Step2StyleContract: React.FC<Step2StyleContractProps> = ({
           <input
             type="text"
             value={style.fps || ""}
-            onChange={(e) => onChange({ ...style, fps: e.target.value })}
+            onChange={(e) => updateFps(e.target.value)}
             placeholder="Ex: 24 FPS (cinéma) · 30 FPS (vidéo) · 60 FPS (smooth) · 12-24 FPS (anime/manga)"
             className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-amber-500 focus:outline-none transition"
           />
