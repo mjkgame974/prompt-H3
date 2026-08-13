@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   ArrowLeft,
   ArrowRight,
   Sparkles,
-  RotateCcw,
   CheckCircle2,
   AlertTriangle,
   Zap,
@@ -14,11 +13,14 @@ import { ImportAnalysisResult } from "./types/project";
 import { validateProjectData } from "./utils/rulesEngine";
 import { analyzeAndValidateImportJson } from "./utils/schemaValidator";
 import {
-  loadProjectFromLocalStorage,
-  saveProjectToLocalStorage,
-  clearProjectFromLocalStorage,
+  loadProjectsFromLocalStorage,
+  saveProjectsToLocalStorage,
+  upsertProjectInStore,
+  createEmptyStore,
   getLastSavedAt,
   isLocalStorageAvailable,
+  ProjectsStore,
+  StoredProject,
 } from "./utils/persistence";
 import { Navbar } from "./components/Navbar";
 import { WizardProgress, WIZARD_STEPS } from "./components/WizardProgress";
@@ -42,11 +44,26 @@ import { compileMiniMaxH3Prompt } from "./utils/compiler";
 import { exportProjectToJson } from "./utils/jsonHandler";
 
 export default function App() {
-  // Load the persisted project on first mount (if any), otherwise fall back to defaults.
+  // ---- Multi-project store (history) ----
+  // We keep two related pieces of state:
+  //  - `project`     : the currently active project (the one the user is editing)
+  //  - `store`       : the full history of all projects + which one is active
+  // The store is synced from `project` on every change, then debounced-persisted.
   const [project, setProject] = useState<ProjectData>(() => {
-    const persisted = loadProjectFromLocalStorage();
-    return persisted || INITIAL_PROJECT_DATA;
+    const loaded = loadProjectsFromLocalStorage();
+    if (loaded?.activeProjectId) {
+      const active = loaded.projects.find((p) => p.id === loaded.activeProjectId);
+      if (active) return active.data;
+    }
+    return { ...INITIAL_PROJECT_DATA, id: `proj_${Date.now()}` };
   });
+
+  const [store, setStore] = useState<ProjectsStore>(() => {
+    const loaded = loadProjectsFromLocalStorage();
+    if (loaded) return loaded;
+    return createEmptyStore();
+  });
+
   const [issues, setIssues] = useState<ValidationIssue[]>([]);
   const [isChecklistOpen, setIsChecklistOpen] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
@@ -65,6 +82,28 @@ export default function App() {
   const [justSaved, setJustSaved] = useState(false);
   const [storageAvailable] = useState<boolean>(() => isLocalStorageAvailable());
 
+  // ---- Sync the active project into the store on every change ----
+  useEffect(() => {
+    setStore((prev) => upsertProjectInStore(prev, project));
+  }, [project]);
+
+  // ---- Debounced persist of the entire store to localStorage (500ms) ----
+  const storeRef = useRef(store);
+  storeRef.current = store;
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      const success = saveProjectsToLocalStorage(storeRef.current);
+      if (success) {
+        const now = new Date().toISOString();
+        setLastSavedAt(now);
+        setJustSaved(true);
+        window.setTimeout(() => setJustSaved(false), 1500);
+      }
+    }, 500);
+    return () => window.clearTimeout(handle);
+  }, [store]);
+
   useEffect(() => {
     const handleBeforeInstall = (e: Event) => {
       e.preventDefault();
@@ -75,22 +114,6 @@ export default function App() {
     window.addEventListener("beforeinstallprompt", handleBeforeInstall);
     return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
   }, []);
-
-  // Debounced autosave to localStorage (500ms after the last project change).
-  // We avoid persisting on the very first render so we don't immediately overwrite
-  // a freshly-imported project with the initial default.
-  useEffect(() => {
-    const handle = window.setTimeout(() => {
-      const success = saveProjectToLocalStorage(project);
-      if (success) {
-        const now = new Date().toISOString();
-        setLastSavedAt(now);
-        setJustSaved(true);
-        window.setTimeout(() => setJustSaved(false), 1500);
-      }
-    }, 500);
-    return () => window.clearTimeout(handle);
-  }, [project]);
 
   const handleInstallPwa = () => {
     if (deferredPrompt) {
@@ -116,6 +139,45 @@ export default function App() {
     }));
   };
 
+  // ---- Explicit save: bypasses the 500ms debounce ----
+  const handleSaveNow = useCallback(() => {
+    const success = saveProjectsToLocalStorage(storeRef.current);
+    if (success) {
+      setLastSavedAt(new Date().toISOString());
+      setJustSaved(true);
+      window.setTimeout(() => setJustSaved(false), 1500);
+    }
+  }, []);
+
+  // ---- Switch to another project from the history ----
+  const handleSwitchProject = useCallback((projectId: string) => {
+    const target = storeRef.current.projects.find((p) => p.id === projectId);
+    if (target) {
+      setProject(target.data);
+      setStore((prev) => ({ ...prev, activeProjectId: projectId }));
+      setAiSuggestions([]);
+    }
+  }, []);
+
+  // ---- Delete a project from the history ----
+  const handleDeleteProject = useCallback((projectId: string) => {
+    setStore((prev) => {
+      const remaining = prev.projects.filter((p) => p.id !== projectId);
+      const newActive =
+        prev.activeProjectId === projectId
+          ? remaining[0]?.id ?? null
+          : prev.activeProjectId;
+      return { ...prev, projects: remaining, activeProjectId: newActive };
+    });
+    // If the deleted project was the active one, load the new active (or default)
+    setProject((currentActive) => {
+      if (currentActive.id !== projectId) return currentActive;
+      const remaining = storeRef.current.projects.filter((p) => p.id !== projectId);
+      if (remaining.length > 0) return remaining[0].data;
+      return { ...INITIAL_PROJECT_DATA, id: `proj_${Date.now()}` };
+    });
+  }, []);
+
   const handleExportJson = () => {
     exportProjectToJson(project);
   };
@@ -132,7 +194,14 @@ export default function App() {
   };
 
   const handleConfirmImport = (importedProject: ProjectData) => {
-    setProject(importedProject);
+    // Make sure the imported project has a unique id and a fresh timestamp
+    const stamped: ProjectData = {
+      ...importedProject,
+      id: importedProject.id || `proj_${Date.now()}`,
+      lastModifiedAt: new Date().toISOString(),
+    };
+    setProject(stamped);
+    setStore((prev) => upsertProjectInStore(prev, stamped));
     setAiSuggestions([]);
     setIsImportModalOpen(false);
     setImportAnalysis(null);
@@ -141,21 +210,19 @@ export default function App() {
   const handleNewProject = () => {
     if (
       window.confirm(
-        "Voulez-vous vraiment créer un nouveau projet ? Les modifications non enregistrées du projet actuel seront perdues."
+        "Créer un nouveau projet ? Le projet actuel est sauvegardé automatiquement — tu le retrouveras dans l'historique."
       )
     ) {
       const newId = `proj_${Date.now()}`;
-      setProject({
+      const fresh: ProjectData = {
         ...INITIAL_PROJECT_DATA,
         id: newId,
-        title: "Nouveau Projet H3",
+        title: "Nouveau projet H3",
         lastModifiedAt: new Date().toISOString(),
-      });
+      };
+      setProject(fresh);
+      setStore((prev) => upsertProjectInStore(prev, fresh));
       setAiSuggestions([]);
-      // Also clear the persisted localStorage copy — otherwise the next autosave
-      // tick will save the new (empty) project on top of the old envelope.
-      clearProjectFromLocalStorage();
-      setLastSavedAt(null);
     }
   };
 
@@ -278,8 +345,12 @@ export default function App() {
       {/* Header Navigation */}
       <Navbar
         project={project}
+        store={store}
         onLoadPreset={handleLoadPreset}
         onNewProject={handleNewProject}
+        onSwitchProject={handleSwitchProject}
+        onDeleteProject={handleDeleteProject}
+        onSaveNow={handleSaveNow}
         onOpenChecklist={() => setIsChecklistOpen(true)}
         onExportJson={handleExportJson}
         onSelectFileForImport={handleSelectFileForImport}

@@ -1,34 +1,44 @@
 import { ProjectData } from "../types/minimax";
 
 /**
- * LocalStorage persistence layer for MiniMax H3 projects.
+ * LocalStorage persistence layer for MiniMax H3 — multi-project support.
  *
  * Strategy:
- *  - One project at a time, keyed by storage key with a version suffix.
+ *  - All projects are stored in a single envelope (ProjectsStore) under one key.
+ *  - The envelope records the active project id, so reopening the app
+ *    resumes the project the user was last editing.
  *  - Load is defensive: returns null on parse error, schema mismatch, or missing key.
  *  - Save is wrapped in try/catch so a quota/private-mode failure never crashes the app.
  *  - Last-saved timestamp is tracked in a separate key for cheap "saved X min ago" UI.
  */
 
-const STORAGE_KEY = "minimax-h3-project-v2";
-const TIMESTAMP_KEY = "minimax-h3-last-saved-v2";
+const STORAGE_KEY = "minimax-h3-projects-v3";
+const TIMESTAMP_KEY = "minimax-h3-last-saved-v3";
+
 /**
- * Bump this whenever the schema of the persisted project changes in a
- * backward-incompatible way (e.g. new required fields, removed fields,
- * semantic changes). The persisted envelope stores this version; on load
- * a mismatch causes the localStorage to be ignored, letting the user
- * start fresh with the new INITIAL_PROJECT_DATA.
+ * Bump this whenever the schema of the persisted store changes in a
+ * backward-incompatible way. The persisted envelope stores this version;
+ * on load a mismatch causes the localStorage to be ignored, letting the
+ * user start fresh.
  *
  * History:
- *  - 1: initial release
- *  - 2: empty default project (no more pre-filled perfume ad) + French prompt view
+ *  - 1: initial release (single project)
+ *  - 2: empty default project + French prompt view (single project)
+ *  - 3: multi-project history (this version)
  */
-const CURRENT_PERSISTENCE_VERSION = 2;
+export const CURRENT_PERSISTENCE_VERSION = 3;
 
-interface PersistedEnvelope {
+export interface StoredProject {
+  id: string;
+  title: string;
+  lastModifiedAt: string;
+  data: ProjectData;
+}
+
+export interface ProjectsStore {
   persistenceVersion: number;
-  savedAt: string;
-  project: ProjectData;
+  activeProjectId: string | null;
+  projects: StoredProject[];
 }
 
 /**
@@ -48,20 +58,21 @@ export function isLocalStorageAvailable(): boolean {
 }
 
 /**
- * Load the persisted project from localStorage, or return null if
+ * Load the persisted store from localStorage, or return null if
  * - no key exists
  * - the JSON is corrupted
  * - the envelope version doesn't match the current persistence version
+ * - the envelope shape is invalid
  */
-export function loadProjectFromLocalStorage(): ProjectData | null {
+export function loadProjectsFromLocalStorage(): ProjectsStore | null {
   if (!isLocalStorageAvailable()) return null;
 
   const raw = window.localStorage.getItem(STORAGE_KEY);
   if (!raw) return null;
 
-  let envelope: PersistedEnvelope;
+  let store: ProjectsStore;
   try {
-    envelope = JSON.parse(raw);
+    store = JSON.parse(raw);
   } catch {
     // Corrupted JSON — wipe it to avoid blocking the user on next save.
     try {
@@ -74,34 +85,29 @@ export function loadProjectFromLocalStorage(): ProjectData | null {
   }
 
   if (
-    !envelope ||
-    typeof envelope !== "object" ||
-    envelope.persistenceVersion !== CURRENT_PERSISTENCE_VERSION ||
-    !envelope.project ||
-    typeof envelope.project !== "object"
+    !store ||
+    typeof store !== "object" ||
+    store.persistenceVersion !== CURRENT_PERSISTENCE_VERSION ||
+    !Array.isArray(store.projects)
   ) {
     return null;
   }
 
-  return envelope.project;
+  return store;
 }
 
 /**
- * Persist the project to localStorage. Returns true on success, false on failure
- * (quota exceeded, private mode, etc.) — never throws.
+ * Persist the entire store to localStorage. Returns true on success,
+ * false on failure (quota exceeded, private mode, etc.) — never throws.
  */
-export function saveProjectToLocalStorage(project: ProjectData): boolean {
+export function saveProjectsToLocalStorage(store: ProjectsStore): boolean {
   if (!isLocalStorageAvailable()) return false;
 
-  const envelope: PersistedEnvelope = {
-    persistenceVersion: CURRENT_PERSISTENCE_VERSION,
-    savedAt: new Date().toISOString(),
-    project,
-  };
+  const now = new Date().toISOString();
 
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
-    window.localStorage.setItem(TIMESTAMP_KEY, envelope.savedAt);
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+    window.localStorage.setItem(TIMESTAMP_KEY, now);
     return true;
   } catch {
     return false;
@@ -109,9 +115,9 @@ export function saveProjectToLocalStorage(project: ProjectData): boolean {
 }
 
 /**
- * Remove the persisted project from localStorage. Idempotent.
+ * Remove ALL persisted projects from localStorage. Idempotent.
  */
-export function clearProjectFromLocalStorage(): void {
+export function clearProjectsFromLocalStorage(): void {
   if (!isLocalStorageAvailable()) return;
   try {
     window.localStorage.removeItem(STORAGE_KEY);
@@ -131,6 +137,45 @@ export function getLastSavedAt(): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Pure helper: upsert a project into the store and mark it active.
+ * Returns a new store (does not mutate).
+ */
+export function upsertProjectInStore(
+  store: ProjectsStore,
+  project: ProjectData,
+  now: string = new Date().toISOString()
+): ProjectsStore {
+  const entry: StoredProject = {
+    id: project.id,
+    title: project.title || "Sans titre",
+    lastModifiedAt: now,
+    data: project,
+  };
+  const idx = store.projects.findIndex((p) => p.id === project.id);
+  const projects =
+    idx >= 0
+      ? store.projects.map((p, i) => (i === idx ? entry : p))
+      : [...store.projects, entry];
+
+  return {
+    ...store,
+    activeProjectId: project.id,
+    projects,
+  };
+}
+
+/**
+ * Pure helper: create an empty store for first-time users.
+ */
+export function createEmptyStore(): ProjectsStore {
+  return {
+    persistenceVersion: CURRENT_PERSISTENCE_VERSION,
+    activeProjectId: null,
+    projects: [],
+  };
 }
 
 /**
@@ -156,4 +201,14 @@ export function formatLastSavedAgo(savedAtIso: string | null, now: Date = new Da
 
   const diffDay = Math.floor(diffHour / 24);
   return `il y a ${diffDay} j`;
+}
+
+/**
+ * Sort projects by lastModifiedAt, most recent first.
+ * Returns a new array.
+ */
+export function sortProjectsByRecency(projects: StoredProject[]): StoredProject[] {
+  return [...projects].sort(
+    (a, b) => new Date(b.lastModifiedAt).getTime() - new Date(a.lastModifiedAt).getTime()
+  );
 }
