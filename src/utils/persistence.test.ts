@@ -9,8 +9,8 @@ import {
 } from "./persistence";
 import { validPerfumeProject } from "./__fixtures__/projectFixture";
 
-const STORAGE_KEY = "minimax-h3-project-v1";
-const TIMESTAMP_KEY = "minimax-h3-last-saved-v1";
+const STORAGE_KEY = "minimax-h3-project-v2";
+const TIMESTAMP_KEY = "minimax-h3-last-saved-v2";
 
 beforeEach(() => {
   window.localStorage.clear();

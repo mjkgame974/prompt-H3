@@ -37,6 +37,45 @@ export const SPEED_TRANSLATIONS: Record<MotionSpeed, string> = {
   dynamic: "energetic variable pacing",
 };
 
+// ----- French translations (used by compileFrenchPrompt) -----
+
+export const FRAMING_TRANSLATIONS_FR: Record<FramingType, string> = {
+  wide: "Plan large",
+  medium: "Plan moyen",
+  close_up: "Gros plan",
+  extreme_close_up: "Très gros plan",
+  establishing: "Plan d'ensemble",
+};
+
+export const ANGLE_TRANSLATIONS_FR: Record<CameraAngle, string> = {
+  eye_level: "À hauteur d'œil",
+  low_angle: "Contre-plongée",
+  high_angle: "Plongée",
+  birds_eye: "Vue aérienne (plongée totale)",
+  dutch_angle: "Angle incliné (hollandais)",
+};
+
+export const MOTION_TRANSLATIONS_FR: Record<CameraMotion, string> = {
+  static: "Caméra fixe",
+  tracking_forward: "Travelling avant",
+  tracking_backward: "Travelling arrière",
+  panning_left: "Panoramique vers la gauche",
+  panning_right: "Panoramique vers la droite",
+  orbit: "Orbite autour du sujet",
+  crane_up: "Grue qui monte",
+  crane_down: "Grue qui descend",
+  handheld: "Caméra à l'épaule (légère)",
+  zoom_in: "Zoom avant",
+  zoom_out: "Zoom arrière",
+};
+
+export const SPEED_TRANSLATIONS_FR: Record<MotionSpeed, string> = {
+  subtle: "à vitesse subtile",
+  smooth: "à vitesse fluide et régulière",
+  fast: "à vitesse rapide et dynamique",
+  dynamic: "au rythme variable et énergique",
+};
+
 /**
  * Basic heuristic French to English translator for common video terms
  */

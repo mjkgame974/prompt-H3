@@ -10,9 +10,20 @@ import { ProjectData } from "../types/minimax";
  *  - Last-saved timestamp is tracked in a separate key for cheap "saved X min ago" UI.
  */
 
-const STORAGE_KEY = "minimax-h3-project-v1";
-const TIMESTAMP_KEY = "minimax-h3-last-saved-v1";
-const CURRENT_PERSISTENCE_VERSION = 1;
+const STORAGE_KEY = "minimax-h3-project-v2";
+const TIMESTAMP_KEY = "minimax-h3-last-saved-v2";
+/**
+ * Bump this whenever the schema of the persisted project changes in a
+ * backward-incompatible way (e.g. new required fields, removed fields,
+ * semantic changes). The persisted envelope stores this version; on load
+ * a mismatch causes the localStorage to be ignored, letting the user
+ * start fresh with the new INITIAL_PROJECT_DATA.
+ *
+ * History:
+ *  - 1: initial release
+ *  - 2: empty default project (no more pre-filled perfume ad) + French prompt view
+ */
+const CURRENT_PERSISTENCE_VERSION = 2;
 
 interface PersistedEnvelope {
   persistenceVersion: number;

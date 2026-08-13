@@ -3,8 +3,14 @@ import {
   compileMiniMaxH3Prompt,
   compile5sTestPrompt,
   compileBlockStructured,
+  compileFrenchPrompt,
+  compileBlockStructuredFrench,
 } from "./compiler";
-import { validPerfumeProject, short5sProject } from "./__fixtures__/projectFixture";
+import {
+  validPerfumeProject,
+  short5sProject,
+  emptyProject,
+} from "./__fixtures__/projectFixture";
 
 describe("compileMiniMaxH3Prompt", () => {
   it("starts with a [STYLE CONTRACT] block containing the condensed English sentence", () => {
@@ -174,5 +180,116 @@ describe("compileBlockStructured", () => {
       preservationRules: { elementsToPreserve: "", mistakesToAvoid: "" },
     });
     expect(blocks.preservationBlock).toContain("Preserve key subject details");
+  });
+});
+
+describe("compileFrenchPrompt", () => {
+  it("emits French block labels ([CONTRAT DE STYLE], [PLANS & TIMELINE]...)", () => {
+    const prompt = compileFrenchPrompt(validPerfumeProject);
+    expect(prompt).toContain("[CONTRAT DE STYLE]");
+    expect(prompt).toContain("[PLANS & TIMELINE]");
+    expect(prompt).toContain("[CONCEPTION AUDIO]");
+    expect(prompt).toContain("[TEXTE À L'ÉCRAN & DIALOGUES]");
+    expect(prompt).toContain("[PRÉSERVATION & RÉFÉRENCES]");
+    expect(prompt).toContain("[CONTRAINTES NÉGATIVES]");
+  });
+
+  it("uses the condensedEnglishSentence as-is (with a French explanation note)", () => {
+    const prompt = compileFrenchPrompt(validPerfumeProject);
+    expect(prompt).toContain("Macro studio commercial camera, flawless metallic sheen");
+    expect(prompt).toContain("utilisée en anglais dans le prompt final H3");
+  });
+
+  it("renders Shot 1 without a timestamp and Shot 2+ with [Plan N] À HH:MM:SS", () => {
+    const prompt = compileFrenchPrompt(validPerfumeProject);
+    expect(prompt).toContain("[Plan 1]");
+    expect(prompt).toContain("[Plan 2] À 00:05.000");
+  });
+
+  it("uses French camera terminology (Plan moyen, Contre-plongée, Travelling avant...)", () => {
+    const prompt = compileFrenchPrompt(validPerfumeProject);
+    expect(prompt).toContain("Plan moyen");
+    expect(prompt).toContain("Contre-plongée");
+    expect(prompt).toContain("Travelling avant");
+    expect(prompt).toContain("à vitesse subtile");
+  });
+
+  it("renders the on-screen text with French guillemets and exact content", () => {
+    const prompt = compileFrenchPrompt(validPerfumeProject);
+    expect(prompt).toContain('« PURE LUXURY »');
+  });
+
+  it("renders dialogue with the language name in French", () => {
+    const prompt = compileFrenchPrompt({
+      ...validPerfumeProject,
+      spokenDialogue: {
+        hasDialogue: true,
+        languageCode: "English",
+        exactLines: "Hello world",
+      },
+    });
+    expect(prompt).toContain("Dialogue parlé (English) : Hello world");
+  });
+
+  it("shows a placeholder when the project is empty (no shots, no style)", () => {
+    const prompt = compileFrenchPrompt(emptyProject);
+    expect(prompt).toContain("[CONTRAT DE STYLE]");
+    expect(prompt).toContain("(Aucun plan défini");
+    expect(prompt).toContain("Silence");
+  });
+
+  it("synthesises a style contract from individual fields when no condensed sentence is set", () => {
+    const prompt = compileFrenchPrompt({
+      ...validPerfumeProject,
+      styleContract: {
+        ...validPerfumeProject.styleContract,
+        condensedEnglishSentence: "",
+      },
+    });
+    expect(prompt).toContain("Medium : Macro studio commercial camera");
+    expect(prompt).toContain("Palette : gold, obsidian black");
+  });
+
+  it("emits negative constraints verbatim (the user typed them in English)", () => {
+    const prompt = compileFrenchPrompt({
+      ...validPerfumeProject,
+      negativeConstraints: [
+        { id: "n1", text: "no plastic look" },
+        { id: "n2", text: "no pixelated artifacts" },
+        { id: "n3", text: "no slow motion" },
+      ],
+    });
+    expect(prompt).toContain("no plastic look, no pixelated artifacts, no slow motion");
+  });
+});
+
+describe("compileBlockStructuredFrench", () => {
+  it("returns all 7 expected blocks (matches the English API)", () => {
+    const blocks = compileBlockStructuredFrench(validPerfumeProject);
+    expect(blocks).toHaveProperty("styleContractBlock");
+    expect(blocks).toHaveProperty("timelineBlock");
+    expect(blocks).toHaveProperty("cameraBlock");
+    expect(blocks).toHaveProperty("audioBlock");
+    expect(blocks).toHaveProperty("textAndDialogueBlock");
+    expect(blocks).toHaveProperty("preservationBlock");
+    expect(blocks).toHaveProperty("negativeConstraintsBlock");
+  });
+
+  it("renders references in French with their role", () => {
+    const blocks = compileBlockStructuredFrench({
+      ...validPerfumeProject,
+      references: [
+        {
+          id: "ref1",
+          name: "Bottle hero",
+          role: "produit",
+          definesText: "Forme du flacon",
+          preserveText: "Logo intact",
+        },
+      ],
+    });
+    expect(blocks.preservationBlock).toContain("Référence 1 (rôle : produit)");
+    expect(blocks.preservationBlock).toContain("Forme du flacon");
+    expect(blocks.preservationBlock).toContain("À préserver : Logo intact");
   });
 });

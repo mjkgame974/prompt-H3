@@ -23,6 +23,8 @@ import {
   compile5sTestPrompt,
   compileBlockStructured,
   compileMiniMaxH3Prompt,
+  compileFrenchPrompt,
+  compileBlockStructuredFrench,
 } from "../../utils/compiler";
 import { ExportProjectButton } from "../ExportProjectButton";
 
@@ -47,12 +49,15 @@ export const Step9Generation: React.FC<Step9GenerationProps> = ({
 }) => {
   const [copiedFull, setCopiedFull] = useState(false);
   const [copied5s, setCopied5s] = useState(false);
-  const [activeTab, setActiveTab] = useState<"full" | "5s" | "blocks">("full");
+  const [copiedFr, setCopiedFr] = useState(false);
+  const [activeTab, setActiveTab] = useState<"full" | "5s" | "blocks" | "fr">("full");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fullPrompt = project.optimizedPrompt || compileMiniMaxH3Prompt(project);
   const test5sPrompt = compile5sTestPrompt(project);
   const blocks = compileBlockStructured(project);
+  const frenchPrompt = compileFrenchPrompt(project);
+  const blocksFr = compileBlockStructuredFrench(project);
 
   const handleCopyFull = () => {
     navigator.clipboard.writeText(fullPrompt);
@@ -64,6 +69,12 @@ export const Step9Generation: React.FC<Step9GenerationProps> = ({
     navigator.clipboard.writeText(test5sPrompt);
     setCopied5s(true);
     setTimeout(() => setCopied5s(false), 2000);
+  };
+
+  const handleCopyFr = () => {
+    navigator.clipboard.writeText(frenchPrompt);
+    setCopiedFr(true);
+    setTimeout(() => setCopiedFr(false), 2000);
   };
 
   const handleDownloadTxt = () => {
@@ -153,6 +164,18 @@ export const Step9Generation: React.FC<Step9GenerationProps> = ({
             }`}
           >
             Vue Structurée
+          </button>
+
+          <button
+            onClick={() => setActiveTab("fr")}
+            className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center space-x-1 ${
+              activeTab === "fr"
+                ? "bg-amber-500 text-slate-950 shadow-sm"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <span>🇫🇷</span>
+            <span>Vue Française</span>
           </button>
         </div>
 
@@ -283,6 +306,44 @@ export const Step9Generation: React.FC<Step9GenerationProps> = ({
               6. LISTE NÉGATIVE (3-6 ITEMS)
             </span>
             <p className="text-slate-200">{blocks.negativeConstraintsBlock}</p>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "fr" && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center space-x-1.5">
+              <span>🇫🇷</span>
+              <span>Version Française (lecture — pour comprendre ce qui sera envoyé à H3)</span>
+            </label>
+            <button
+              onClick={handleCopyFr}
+              className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white shadow-lg shadow-blue-500/20 transition active:scale-95"
+            >
+              {copiedFr ? (
+                <>
+                  <Check className="w-4 h-4" />
+                  <span>Copié !</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4" />
+                  <span>Copier la version FR</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          <div className="p-5 bg-slate-950 border border-blue-500/30 rounded-2xl font-sans text-sm text-slate-100 whitespace-pre-wrap leading-relaxed select-all">
+            {frenchPrompt}
+          </div>
+
+          <div className="p-4 bg-blue-950/30 border border-blue-800/50 rounded-xl text-xs text-blue-200 leading-relaxed">
+            <strong>💡 Astuce :</strong> l'onglet <span className="font-bold">« Prompt Complet (10s) »</span> contient
+            la version anglaise, formatée selon le cahier des charges MiniMax H3 — c'est celle à copier-coller
+            dans ton interface de génération. Cet onglet FR est là pour que tu puisses relire et comprendre
+            ce que tu vas envoyer au modèle, en français.
           </div>
         </div>
       )}

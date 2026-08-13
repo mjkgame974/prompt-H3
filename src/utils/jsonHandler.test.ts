@@ -152,6 +152,9 @@ describe("validateProjectData (re-exported sanity checks)", () => {
   it("flags double camera motion", () => {
     const issues = validateProjectData({
       ...INITIAL_PROJECT_DATA,
+      shots: [
+        { id: "shot_1", shotNumber: 1, visualDescription: "", subjectAction: "", atmosphere: "" },
+      ],
       cameraDirections: {
         shot_1: {
           shotId: "shot_1",

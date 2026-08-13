@@ -8,12 +8,30 @@ import {
   short5sProject,
   projectWithoutAudio,
   projectWithDoubleCamera,
+  emptyProject,
 } from "./__fixtures__/projectFixture";
 
 describe("validateProjectData", () => {
   it("returns no issues for a fully valid project", () => {
     const issues = validateProjectData(validPerfumeProject);
     expect(issues).toEqual([]);
+  });
+
+  it("returns no blocking issues for the empty default project (user starts blank)", () => {
+    const issues = validateProjectData(emptyProject);
+    // Empty project has 0 shots, silent audio, 3 negative constraints — should
+    // produce no issues at all (no warnings, no errors).
+    expect(issues).toEqual([]);
+  });
+
+  it("the empty default project starts at 70/100 (completeness penalties: 0 shots, no style contract)", () => {
+    // The score function penalises incompleteness:
+    //   - no condensedEnglishSentence: -10
+    //   - 0 shots: -20
+    // So an empty project lands at 70/100, and the user climbs back to 100
+    // as they fill in the wizard.
+    const score = calculateH3ComplianceScore(emptyProject);
+    expect(score).toBe(70);
   });
 
   it("flags a 10s video with more than 3 shots", () => {

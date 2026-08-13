@@ -1,0 +1,34 @@
+# MiniMax H3 Assistant — Apache config for Hostinger shared hosting.
+
+# Force HTTPS (Hostinger usually handles this at server level, but explicit is safer)
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTPS} off
+  RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+# Cache-Control headers
+<IfModule mod_headers.c>
+  # Hashed assets (JS / CSS bundles) — cache aggressively (1 year, immutable)
+  <FilesMatch "\.(js|css|png|svg|webp|woff2?)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+
+  # HTML shell + Service Worker + manifest — never cache, so updates roll out instantly
+  <FilesMatch "^(index\.html|sw\.js|manifest\.json)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </FilesMatch>
+
+  # Security headers
+  Header set X-Content-Type-Options "nosniff"
+  Header set X-Frame-Options "SAMEORIGIN"
+  Header set Referrer-Policy "strict-origin-when-cross-origin"
+  Header set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+</IfModule>
+
+# Compression (Hostinger usually has this enabled at server level, but explicit helps)
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json
+</IfModule>
