@@ -1,5 +1,6 @@
 import React from "react";
 import { Volume2, VolumeX, Music, Mic, Check } from "lucide-react";
+import { WizardContextBox } from "../WizardContextBox";
 import { AudioDesign, ProjectData } from "../../types/minimax";
 
 interface Step6AudioProps {
@@ -35,21 +36,15 @@ export const Step6Audio: React.FC<Step6AudioProps> = ({
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Context Box */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
-        <div className="flex items-start space-x-3">
-          <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20 shrink-0">
-            <Volume2 className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="font-bold text-slate-100 text-sm">
-              Étape 6 — Design Audio (Bloc Obligatoire)
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-              Dans MiniMax H3, le bloc audio est <strong>strictement obligatoire</strong>. Si votre vidéo ne contient aucun son, l'application génèrera automatiquement la mention officielle : <code className="text-amber-300">Audio: Room tone only. No music.</code>
-            </p>
-          </div>
-        </div>
-      </div>
+      <WizardContextBox
+        icon={Volume2}
+        title="Étape 6 — Design Audio (Bloc Obligatoire)"
+        description={
+          <>
+            Dans MiniMax H3, le bloc audio est <strong>strictement obligatoire</strong>. Si votre vidéo ne contient aucun son, l'application génèrera automatiquement la mention officielle : <code className="text-amber-300">Audio: Room tone only. No music.</code>
+          </>
+        }
+      />
 
       {/* Silence Mode Selector */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

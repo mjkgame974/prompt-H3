@@ -1,6 +1,7 @@
 import React from "react";
 import { Clock, Plus, Trash2, AlertTriangle, Sparkles } from "lucide-react";
 import { ProjectData, Shot } from "../../types/minimax";
+import { WizardContextBox } from "../WizardContextBox";
 
 interface Step4TimelineProps {
   project: ProjectData;
@@ -48,21 +49,15 @@ export const Step4Timeline: React.FC<Step4TimelineProps> = ({
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Context Box */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
-        <div className="flex items-start space-x-3">
-          <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20 shrink-0">
-            <Clock className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="font-bold text-slate-100 text-sm">
-              Étape 4 — Timeline & Séquence des Plans (Règle 2-3 Moments)
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-              Pour 10 secondes de vidéo, <strong>limitez à 2 ou 3 plans au maximum</strong>. Le premier plan [Shot 1] n'est pas horodaté. Les plans suivants reçoivent un horodatage strictement croissant au format <code className="text-amber-300">At 00:0X.000</code>.
-            </p>
-          </div>
-        </div>
-      </div>
+      <WizardContextBox
+        icon={Clock}
+        title="Étape 4 — Timeline & Séquence des Plans (Règle 2-3 Moments)"
+        description={
+          <>
+            Pour 10 secondes de vidéo, <strong>limitez à 2 ou 3 plans au maximum</strong>. Le premier plan [Shot 1] n'est pas horodaté. Les plans suivants reçoivent un horodatage strictement croissant au format <code className="text-amber-300">At 00:0X.000</code>.
+          </>
+        }
+      />
 
       {/* Shot Count Warning if > 3 */}
       {project.shots.length > 3 && (

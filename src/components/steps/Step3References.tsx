@@ -7,6 +7,7 @@ import {
   Lightbulb,
 } from "lucide-react";
 import { ProjectData, ReferenceItem, ReferenceRole } from "../../types/minimax";
+import { WizardContextBox } from "../WizardContextBox";
 
 interface Step3ReferencesProps {
   project: ProjectData;
@@ -49,24 +50,18 @@ export const Step3References: React.FC<Step3ReferencesProps> = ({
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Context Box */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
-        <div className="flex items-start space-x-3">
-          <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20 shrink-0">
-            <ImageIcon className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="font-bold text-slate-100 text-sm">
-              Étape 3 — Références Visuelles (description textuelle)
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-              Décris les <strong>éléments visuels</strong> que le modèle doit prendre en compte
-              (produit, personnage, décor, ambiance…). Ces descriptions seront injectées dans le bloc
-              <code className="text-amber-300 mx-1">[PRESERVATION &amp; REFERENCES]</code> du prompt
-              final, à côté de tes pièces jointes que tu transmettras directement à l'IA.
-            </p>
-          </div>
-        </div>
-      </div>
+      <WizardContextBox
+        icon={ImageIcon}
+        title="Étape 3 — Références Visuelles (description textuelle)"
+        description={
+          <>
+            Décris les <strong>éléments visuels</strong> que le modèle doit prendre en compte
+            (produit, personnage, décor, ambiance…). Ces descriptions seront injectées dans le bloc
+            <code className="text-amber-300 mx-1">[PRESERVATION &amp; REFERENCES]</code> du prompt
+            final, à côté de tes pièces jointes que tu transmettras directement à l'IA.
+          </>
+        }
+      />
 
       {/* Helper banner */}
       <div className="p-4 bg-blue-950/30 border border-blue-800/50 rounded-xl flex items-start space-x-2.5 text-xs text-blue-200">

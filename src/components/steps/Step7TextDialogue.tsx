@@ -1,5 +1,6 @@
 import React from "react";
 import { Type, MessageSquare, AlertTriangle, Check, Sparkles } from "lucide-react";
+import { WizardContextBox } from "../WizardContextBox";
 import { OnScreenText, ProjectData, SpokenDialogue } from "../../types/minimax";
 
 interface Step7TextDialogueProps {
@@ -24,21 +25,15 @@ export const Step7TextDialogue: React.FC<Step7TextDialogueProps> = ({
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Context Box */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
-        <div className="flex items-start space-x-3">
-          <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20 shrink-0">
-            <Type className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="font-bold text-slate-100 text-sm">
-              Étape 7 — Texte à l'Écran & Dialogues Prononcés
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-              Dans MiniMax H3, il faut <strong>séparer la typographie incrustée du dialogue vocal</strong>. Le texte incrusté doit être écrit avec la syntaxe stricte <code className="text-amber-300">reading exactly: "..."</code>. Les dialogues vocaux utilisent les balises <code className="text-amber-300 font-mono">&lt;d&gt;[Language] ... &lt;/d&gt;</code>.
-            </p>
-          </div>
-        </div>
-      </div>
+      <WizardContextBox
+        icon={Type}
+        title="Étape 7 — Texte à l'Écran & Dialogues Prononcés"
+        description={
+          <>
+            Dans MiniMax H3, il faut <strong>séparer la typographie incrustée du dialogue vocal</strong>. Le texte incrusté doit être écrit avec la syntaxe stricte <code className="text-amber-300">reading exactly: "..."</code>. Les dialogues vocaux utilisent les balises <code className="text-amber-300 font-mono">&lt;d&gt;[Language] ... &lt;/d&gt;</code>.
+          </>
+        }
+      />
 
       {/* Part 1: On-Screen Text */}
       <div className="p-5 bg-slate-950 border border-slate-800 rounded-2xl space-y-4">

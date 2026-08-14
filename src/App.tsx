@@ -370,7 +370,7 @@ export default function App() {
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-12 space-y-8 wizard-scale">
         {/* Wizard Progress Stepper */}
         <WizardProgress
           currentStep={project.step}
@@ -384,8 +384,8 @@ export default function App() {
         {/* Grid Split: Left 7 Cols (Form Wizard), Right 5 Cols (Live Preview) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left Column: Interactive Form Step (7 cols) */}
-          <section className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl relative min-h-[500px] flex flex-col justify-between">
-            <div>
+          <section className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 lg:p-10 shadow-xl relative min-h-[600px] flex flex-col justify-between max-w-3xl mx-auto w-full">
+            <div className="space-y-6 pt-2 lg:pt-4">
               {project.step === 1 && (
                 <Step1Objective project={project} onChange={updateProject} />
               )}

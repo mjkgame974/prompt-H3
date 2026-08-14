@@ -2,6 +2,7 @@ import React from "react";
 import { Palette, Sparkles, Check, HelpCircle } from "lucide-react";
 import { STYLE_PRESETS, StylePreset } from "../../constants/presets";
 import { ProjectData, StyleContract } from "../../types/minimax";
+import { WizardContextBox } from "../WizardContextBox";
 
 interface Step2StyleContractProps {
   project: ProjectData;
@@ -72,21 +73,11 @@ export const Step2StyleContract: React.FC<Step2StyleContractProps> = ({
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Context Box */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
-        <div className="flex items-start space-x-3">
-          <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20 shrink-0">
-            <Palette className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="font-bold text-slate-100 text-sm">
-              Étape 2 — Contrat de Style (L'En-Tête Fixe)
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-              Dans MiniMax H3, le style visuel doit être fixé dès le premier bloc sous forme d'une phrase unique en anglais. Cela garantit que tous les plans suivants partageront une identité esthétique homogène.
-            </p>
-          </div>
-        </div>
-      </div>
+      <WizardContextBox
+        icon={Palette}
+        title="Étape 2 — Contrat de Style (L'En-Tête Fixe)"
+        description="Dans MiniMax H3, le style visuel doit être fixé dès le premier bloc sous forme d'une phrase unique en anglais. Cela garantit que tous les plans suivants partageront une identité esthétique homogène."
+      />
 
       {/* Style Presets */}
       <div className="space-y-3">

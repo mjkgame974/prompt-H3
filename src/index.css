@@ -1,1 +1,25 @@
 @import "tailwindcss";
+
+/**
+ * Wizard font scale: bumps every Tailwind text size by ~20% in the subtree
+ * where this class is applied. We override the CSS variables Tailwind v4
+ * uses internally (--text-xs, --text-sm, --text-base, …) so all existing
+ * text-xs / text-sm / text-base / text-lg / text-xl / text-2xl / text-3xl
+ * utilities automatically render at the larger size, with no per-component
+ * changes.
+ *
+ * Line-height variables are left at their default ratios — they auto-scale
+ * with the font-size, so readability is preserved.
+ */
+@layer utilities {
+  .wizard-scale {
+    --text-2xs: 0.675rem;
+    --text-xs: 0.9rem;
+    --text-sm: 1.05rem;
+    --text-base: 1.2rem;
+    --text-lg: 1.35rem;
+    --text-xl: 1.5rem;
+    --text-2xl: 1.8rem;
+    --text-3xl: 2.25rem;
+  }
+}

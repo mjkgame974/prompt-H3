@@ -1,5 +1,6 @@
 import React from "react";
 import { Camera, AlertCircle, ShieldAlert, Check } from "lucide-react";
+import { WizardContextBox } from "../WizardContextBox";
 import {
   ANGLE_TRANSLATIONS,
   FRAMING_TRANSLATIONS,
@@ -113,21 +114,15 @@ export const Step5Camera: React.FC<Step5CameraProps> = ({
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Context Box */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
-        <div className="flex items-start space-x-3">
-          <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20 shrink-0">
-            <Camera className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="font-bold text-slate-100 text-sm">
-              Étape 5 — Mouvements de Caméra (Règle Stricte : 1 Seul Mouvement)
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-              Pour garantir la stabilité du modèle MiniMax H3 et éviter les déformations visuelles, <strong>un SEUL mouvement de caméra est autorisé par plan</strong>. Toute combinaison de deux mouvements simultanés sera bloquée.
-            </p>
-          </div>
-        </div>
-      </div>
+      <WizardContextBox
+        icon={Camera}
+        title="Étape 5 — Mouvements de Caméra (Règle Stricte : 1 Seul Mouvement)"
+        description={
+          <>
+            Pour garantir la stabilité du modèle MiniMax H3 et éviter les déformations visuelles, <strong>un SEUL mouvement de caméra est autorisé par plan</strong>. Toute combinaison de deux mouvements simultanés sera bloquée.
+          </>
+        }
+      />
 
       {/* Per Shot Camera Setup */}
       <div className="space-y-6">

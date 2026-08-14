@@ -1,5 +1,6 @@
 import React from "react";
 import { ShieldAlert, Plus, Trash2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { WizardContextBox } from "../WizardContextBox";
 import { NegativeConstraint, PreservationRules, ProjectData } from "../../types/minimax";
 
 interface Step8ConstraintsProps {
@@ -51,21 +52,17 @@ export const Step8Constraints: React.FC<Step8ConstraintsProps> = ({
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Context Box */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
-        <div className="flex items-start space-x-3">
-          <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20 shrink-0">
-            <ShieldAlert className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="font-bold text-slate-100 text-sm">
-              Étape 8 — Consignes de Préservation & Liste Négative
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-              Définissez explicitement ce qui doit rester inchangé pendant la génération, et <strong>limitez votre liste négative à 3 à 6 contraintes utiles</strong>. Trop de contraintes négatives risquent de perturber la cohérence créative.
-            </p>
-          </div>
-        </div>
-      </div>
+      <WizardContextBox
+        icon={ShieldAlert}
+        title="Étape 8 — Consignes de Préservation & Liste Négative"
+        description={
+          <>
+            Définissez explicitement ce qui doit rester inchangé pendant la génération, et{" "}
+            <strong>limitez votre liste négative à 3 à 6 contraintes utiles</strong>. Trop de
+            contraintes négatives risquent de perturber la cohérence créative.
+          </>
+        }
+      />
 
       {/* Part 1: Preservation Rules */}
       <div className="p-5 bg-slate-950 border border-slate-800 rounded-2xl space-y-4">

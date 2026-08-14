@@ -1,6 +1,7 @@
 import React from "react";
 import { Target, Sparkles, Clock, Monitor, Heart, Layers } from "lucide-react";
 import { AspectRatio, ProjectData, VideoDuration, VideoGoal, VideoType } from "../../types/minimax";
+import { WizardContextBox } from "../WizardContextBox";
 
 interface Step1ObjectiveProps {
   project: ProjectData;
@@ -35,21 +36,11 @@ export const Step1Objective: React.FC<Step1ObjectiveProps> = ({
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Intro Context Box */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
-        <div className="flex items-start space-x-3">
-          <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20 shrink-0">
-            <Target className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="font-bold text-slate-100 text-sm">
-              Étape 1 — Définition du Cadrage & de l'Objectif
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-              Définissez le cadre général de votre vidéo MiniMax H3. La durée et le format conditionneront automatiquement le découpage en plans lors des étapes suivantes.
-            </p>
-          </div>
-        </div>
-      </div>
+      <WizardContextBox
+        icon={Target}
+        title="Étape 1 — Définition du Cadrage & de l'Objectif"
+        description="Définissez le cadre général de votre vidéo MiniMax H3. La durée et le format conditionneront automatiquement le découpage en plans lors des étapes suivantes."
+      />
 
       {/* Titre du Projet */}
       <div className="space-y-2">
