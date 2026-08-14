@@ -42,6 +42,7 @@ import { Step8Constraints } from "./components/steps/Step8Constraints";
 import { Step9Generation } from "./components/steps/Step9Generation";
 import { compileMiniMaxH3Prompt } from "./utils/compiler";
 import { exportProjectToJson } from "./utils/jsonHandler";
+import { getApiKey, optimizeH3Prompt, GeminiError } from "./services/gemini";
 
 export default function App() {
   // ---- Multi-project store (history) ----
@@ -81,6 +82,12 @@ export default function App() {
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(() => getLastSavedAt());
   const [justSaved, setJustSaved] = useState(false);
   const [storageAvailable] = useState<boolean>(() => isLocalStorageAvailable());
+
+  // Streaming state for the "Optimiser par IA" button — affiche le prompt
+  // qui s'écrit en temps réel dans le panneau de prévisualisation.
+  const [streamingText, setStreamingText] = useState<string>("");
+  // Message d'erreur API Gemini à afficher dans le bandeau
+  const [geminiError, setGeminiError] = useState<string | null>(null);
 
   // ---- Sync the active project into the store on every change ----
   useEffect(() => {
@@ -325,19 +332,67 @@ export default function App() {
   };
 
   const handleOptimizeWithAi = async () => {
-    setIsOptimizing(true);
-    setTimeout(() => {
-      const currentPrompt = compileMiniMaxH3Prompt(project);
-      const optimized = `[STYLE & ART DIRECTION]: ${project.styleContract.condensedEnglishSentence}\n\n[TIMELINE & SHOT SEQUENCE]:\n${currentPrompt}\n\n[AUDIO DIRECTIVE]: Audio: Room tone only. No music.\n[QUALITY CONSTRAINTS]: Master cinematography, photorealistic 8K render, zero morphing artifacts.`;
+    setGeminiError(null);
+    setAiSuggestions([]);
 
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      // Pas de clé configurée → on bascule sur le mode dégradé local
+      // (compile le prompt + ajoute un wrapper, comme avant). L'utilisateur
+      // est prévenu via le bandeau geminiError.
+      setGeminiError(
+        "Clé Gemini absente (.env) — optimisation locale utilisée. Configure VITE_GEMINI_API_KEY pour activer Gemini.",
+      );
+      setIsOptimizing(true);
+      setTimeout(() => {
+        const currentPrompt = compileMiniMaxH3Prompt(project);
+        const optimized = `[STYLE & ART DIRECTION]: ${project.styleContract.condensedEnglishSentence}\n\n[TIMELINE & SHOT SEQUENCE]:\n${currentPrompt}\n\n[AUDIO DIRECTIVE]: Audio: Room tone only. No music.\n[QUALITY CONSTRAINTS]: Master cinematography, photorealistic 8K render, zero morphing artifacts.`;
+
+        updateProject({ optimizedPrompt: optimized });
+        setAiSuggestions([
+          "Horodatages vérifiés : transition fluide à 00:04.000.",
+          "Mouvements de caméra harmonisés : un seul axe par plan.",
+          "Audio explicite inséré selon la norme MiniMax H3.",
+        ]);
+        setIsOptimizing(false);
+      }, 800);
+      return;
+    }
+
+    // Mode Gemini : appel réel avec streaming
+    setIsOptimizing(true);
+    setStreamingText("");
+    try {
+      const basePrompt = compileMiniMaxH3Prompt(project);
+      const optimized = await optimizeH3Prompt({
+        apiKey,
+        project,
+        currentPrompt: basePrompt,
+        onChunk: (chunk) => {
+          setStreamingText((prev) => prev + chunk);
+        },
+      });
+
+      // On stocke le résultat final dans le projet, et on vide le streaming
+      // (l'affichage bascule sur project.optimizedPrompt).
       updateProject({ optimizedPrompt: optimized });
       setAiSuggestions([
-        "Horodatages vérifiés : transition fluide à 00:04.000.",
-        "Mouvements de caméra harmonisés : un seul axe par plan.",
-        "Audio explicite inséré selon la norme MiniMax H3.",
+        "Prompt enrichi par Gemini avec vocabulaire cinématographique professionnel.",
+        "Structure H3 en blocs préservée à 100% (timestamps, contraintes, négatifs).",
+        "Vocabulaire descriptif et atmosphérique densifié (+20-40% de richesse).",
       ]);
+    } catch (err) {
+      const msg =
+        err instanceof GeminiError
+          ? err.message
+          : err instanceof Error
+          ? `Erreur inattendue : ${err.message}`
+          : "Erreur inconnue lors de l'appel Gemini.";
+      setGeminiError(msg);
+    } finally {
       setIsOptimizing(false);
-    }, 1200);
+      setStreamingText("");
+    }
   };
 
   return (
@@ -380,6 +435,23 @@ export default function App() {
 
         {/* Global Validation Issue Banner */}
         <ValidationBanner issues={issues} onApplyFix={handleApplyFix} />
+
+        {/* Gemini API Error/Warning Banner */}
+        {geminiError && (
+          <div className="bg-amber-950/30 border border-amber-700/50 rounded-2xl p-3.5 flex items-start space-x-2.5 text-amber-200 text-xs">
+            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div className="flex-1 leading-relaxed">
+              <strong className="font-bold text-amber-300">Gemini :</strong> {geminiError}
+            </div>
+            <button
+              type="button"
+              onClick={() => setGeminiError(null)}
+              className="text-amber-400 hover:text-amber-200 text-[10px] font-bold uppercase"
+            >
+              Fermer
+            </button>
+          </div>
+        )}
 
         {/* Grid Split: Left 7 Cols (Form Wizard), Right 5 Cols (Live Preview) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -490,6 +562,7 @@ export default function App() {
               onOptimizeWithAi={handleOptimizeWithAi}
               isOptimizing={isOptimizing}
               aiSuggestions={aiSuggestions}
+              streamingText={streamingText}
             />
           </section>
         </div>

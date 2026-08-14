@@ -25,6 +25,12 @@ interface LivePromptPreviewProps {
   onOptimizeWithAi?: () => void;
   isOptimizing?: boolean;
   aiSuggestions?: string[];
+  /**
+   * Texte en cours de streaming depuis Gemini. Si fourni, il remplace
+   * temporairement le prompt compilé dans la vue "full" pour montrer
+   * le résultat qui s'écrit en direct.
+   */
+  streamingText?: string;
 }
 
 export const LivePromptPreview: React.FC<LivePromptPreviewProps> = ({
@@ -33,14 +39,24 @@ export const LivePromptPreview: React.FC<LivePromptPreviewProps> = ({
   onOptimizeWithAi,
   isOptimizing,
   aiSuggestions,
+  streamingText = "",
 }) => {
   const [copied, setCopied] = useState(false);
   const [viewMode, setViewMode] = useState<"full" | "test5s" | "blocks">("full");
   const [isExpandedMobile, setIsExpandedMobile] = useState(false);
 
-  const fullPrompt = compileMiniMaxH3Prompt(project);
+  const compiledFullPrompt = compileMiniMaxH3Prompt(project);
   const test5sPrompt = compile5sTestPrompt(project);
   const structuredBlocks = compileBlockStructured(project);
+
+  // Hiérarchie d'affichage pour la vue "full" :
+  //  1. Texte en cours de streaming (priorité max) — s'écrit en live
+  //  2. Prompt optimisé Gemini déjà enregistré dans le projet
+  //  3. Prompt compilé par défaut (fallback)
+  const fullPrompt =
+    streamingText ||
+    project.optimizedPrompt ||
+    compiledFullPrompt;
 
   const activePromptToDisplay =
     viewMode === "full"
@@ -173,8 +189,17 @@ export const LivePromptPreview: React.FC<LivePromptPreviewProps> = ({
 
       {/* Prompt Code Container */}
       <div className="flex-1 bg-slate-950 rounded-xl border border-slate-800 p-3.5 font-mono text-xs leading-relaxed text-amber-200/90 overflow-y-auto max-h-[420px] lg:max-h-[500px] select-all space-y-3">
+        {/* Streaming Indicator (Gemini en cours d'écriture) */}
+        {streamingText && viewMode === "full" && (
+          <div className="flex items-center space-x-1.5 text-[10px] uppercase font-bold tracking-wider text-indigo-300 bg-indigo-950/40 border border-indigo-800/50 rounded-lg px-2 py-1 w-fit">
+            <Sparkles className="w-3 h-3 text-indigo-400 animate-pulse" />
+            <span>Gemini écrit en direct…</span>
+            <span className="inline-block w-1.5 h-3 bg-indigo-400 animate-pulse ml-1" />
+          </div>
+        )}
+
         {viewMode !== "blocks" ? (
-          <pre className="whitespace-pre-wrap font-mono text-slate-200">
+          <pre className={`whitespace-pre-wrap font-mono ${streamingText && viewMode === "full" ? "text-indigo-100" : "text-slate-200"}`}>
             {activePromptToDisplay}
           </pre>
         ) : (
