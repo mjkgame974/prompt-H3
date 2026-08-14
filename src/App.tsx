@@ -42,7 +42,18 @@ import { Step8Constraints } from "./components/steps/Step8Constraints";
 import { Step9Generation } from "./components/steps/Step9Generation";
 import { compileMiniMaxH3Prompt } from "./utils/compiler";
 import { exportProjectToJson } from "./utils/jsonHandler";
-import { getApiKey, optimizeH3Prompt, GeminiError } from "./services/gemini";
+import {
+  getApiKey,
+  optimizeH3Prompt,
+  GeminiError,
+  analyzeBriefForQuestions,
+  briefToProject,
+  type ClarificationQuestion,
+  type ClarificationAnswer,
+} from "./services/gemini";
+import { NewProjectChoiceModal } from "./components/NewProjectChoiceModal";
+import { BriefInputModal } from "./components/BriefInputModal";
+import { BriefClarificationModal } from "./components/BriefClarificationModal";
 
 export default function App() {
   // ---- Multi-project store (history) ----
@@ -88,6 +99,18 @@ export default function App() {
   const [streamingText, setStreamingText] = useState<string>("");
   // Message d'erreur API Gemini à afficher dans le bandeau
   const [geminiError, setGeminiError] = useState<string | null>(null);
+
+  // ── State machine "Nouveau projet" ──────────────────────────────────
+  // Quand l'utilisateur clique sur "Nouveau" dans la navbar, on ouvre
+  // d'abord la modale de choix (brief / zéro), puis on enchaîne.
+  const [isNewProjectChoiceOpen, setIsNewProjectChoiceOpen] = useState(false);
+  const [isBriefInputOpen, setIsBriefInputOpen] = useState(false);
+  const [isBriefClarificationOpen, setIsBriefClarificationOpen] = useState(false);
+  const [currentBrief, setCurrentBrief] = useState<string>("");
+  const [clarificationQuestions, setClarificationQuestions] = useState<ClarificationQuestion[]>([]);
+  const [briefProcessingMessage, setBriefProcessingMessage] = useState<string>("");
+  const [isBriefProcessing, setIsBriefProcessing] = useState<boolean>(false);
+  const [aiFilledProject, setAiFilledProject] = useState<boolean>(false);
 
   // ---- Sync the active project into the store on every change ----
   useEffect(() => {
@@ -214,7 +237,21 @@ export default function App() {
     setImportAnalysis(null);
   };
 
+  // ── "Nouveau" : ouvre la modale de choix (brief / zéro) ─────────────
   const handleNewProject = () => {
+    setIsNewProjectChoiceOpen(true);
+  };
+
+  // L'utilisateur a choisi "Démarrer un brief" dans la modale de choix
+  const handleChooseBrief = () => {
+    setIsNewProjectChoiceOpen(false);
+    // Petit délai pour que la fermeture de la modale choice soit visible
+    setTimeout(() => setIsBriefInputOpen(true), 150);
+  };
+
+  // L'utilisateur a choisi "Partir de zéro" → crée un projet vide
+  const handleChooseManual = () => {
+    setIsNewProjectChoiceOpen(false);
     if (
       window.confirm(
         "Créer un nouveau projet ? Le projet actuel est sauvegardé automatiquement — tu le retrouveras dans l'historique."
@@ -230,8 +267,95 @@ export default function App() {
       setProject(fresh);
       setStore((prev) => upsertProjectInStore(prev, fresh));
       setAiSuggestions([]);
+      setAiFilledProject(false);
     }
   };
+
+  // L'utilisateur a soumis son brief → on demande à Gemini de générer
+  // 2-3 questions de clarification objectives.
+  const handleSubmitBrief = async (brief: string) => {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      setGeminiError(
+        "Clé Gemini absente (.env). Le mode brief nécessite Gemini. Configure VITE_GEMINI_API_KEY ou choisis 'Partir de zéro'.",
+      );
+      setIsBriefInputOpen(false);
+      return;
+    }
+
+    setCurrentBrief(brief);
+    setIsBriefProcessing(true);
+    try {
+      const questions = await analyzeBriefForQuestions(brief, apiKey);
+      setClarificationQuestions(questions);
+      setIsBriefInputOpen(false);
+      setIsBriefProcessing(false);
+      // Laisse la transition visuelle se faire
+      setTimeout(() => setIsBriefClarificationOpen(true), 200);
+    } catch (err) {
+      const msg =
+        err instanceof GeminiError
+          ? err.message
+          : err instanceof Error
+          ? `Erreur : ${err.message}`
+          : "Erreur inconnue";
+      setGeminiError(`Impossible d'analyser le brief : ${msg}`);
+      setIsBriefInputOpen(false);
+      setIsBriefProcessing(false);
+    }
+  };
+
+  // L'utilisateur a répondu aux clarifications (ou tout passé) →
+  // on demande à Gemini de générer le projet complet.
+  const handleSubmitClarifications = async (answers: ClarificationAnswer[]) => {
+    const apiKey = getApiKey();
+    if (!apiKey) return;
+
+    setIsBriefProcessing(true);
+    setBriefProcessingMessage("Génération du projet H3…");
+    try {
+      const generated = await briefToProject(currentBrief, answers, apiKey);
+
+      // Merge avec INITIAL_PROJECT_DATA pour garantir tous les champs requis
+      const newId = `proj_${Date.now()}`;
+      const freshProject: ProjectData = {
+        ...INITIAL_PROJECT_DATA,
+        ...generated,
+        id: newId,
+        step: 1,
+        title: generated.title || "Nouveau projet H3",
+        lastModifiedAt: new Date().toISOString(),
+        // Force la jump à l'étape 1
+        // (l'utilisateur y verra la bannière "AI-filled")
+      } as ProjectData;
+
+      setProject(freshProject);
+      setStore((prev) => upsertProjectInStore(prev, freshProject));
+      setAiSuggestions([]);
+      setAiFilledProject(true); // Affiche la bannière sur l'étape 1
+      setIsBriefClarificationOpen(false);
+      setIsBriefProcessing(false);
+      setGeminiError(null);
+    } catch (err) {
+      const msg =
+        err instanceof GeminiError
+          ? err.message
+          : err instanceof Error
+          ? `Erreur : ${err.message}`
+          : "Erreur inconnue";
+      setGeminiError(`Impossible de générer le projet : ${msg}`);
+      setIsBriefClarificationOpen(false);
+      setIsBriefProcessing(false);
+    }
+  };
+
+  // Reset la bannière "AI-filled" quand l'utilisateur change d'étape
+  // (elle ne s'affiche qu'à l'arrivée à l'étape 1).
+  useEffect(() => {
+    if (project.step !== 1 && aiFilledProject) {
+      setAiFilledProject(false);
+    }
+  }, [project.step, aiFilledProject]);
 
   const handleNextStep = () => {
     if (project.step < WIZARD_STEPS.length) {
@@ -426,6 +550,32 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-12 space-y-8 wizard-scale">
+        {/* AI-Filled Banner (visible à l'étape 1 quand le projet vient d'être généré par brief) */}
+        {aiFilledProject && project.step === 1 && (
+          <div className="bg-indigo-950/40 border border-indigo-700/50 rounded-2xl p-4 flex items-start space-x-3 text-indigo-100 shadow-lg shadow-indigo-500/10">
+            <div className="p-2 rounded-xl bg-indigo-500/20 border border-indigo-500/40 shrink-0">
+              <Sparkles className="w-5 h-5 text-indigo-300" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-bold text-sm text-indigo-100">
+                Projet généré à partir de ton brief 🎉
+              </h3>
+              <p className="text-xs text-indigo-200/80 mt-1 leading-relaxed">
+                J'ai pré-rempli les 9 étapes au mieux. <strong>Contrôle chaque
+                champ</strong> ci-dessous et ajuste ce qui ne te convient pas.
+                Tu peux aussi régénérer tout depuis le bouton "Nouveau".
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAiFilledProject(false)}
+              className="text-indigo-300 hover:text-indigo-100 text-[10px] font-bold uppercase"
+            >
+              Masquer
+            </button>
+          </div>
+        )}
+
         {/* Wizard Progress Stepper */}
         <WizardProgress
           currentStep={project.step}
@@ -574,6 +724,30 @@ export default function App() {
         onClose={() => setIsChecklistOpen(false)}
         project={project}
         issues={issues}
+      />
+
+      {/* ── Modales du flow "Nouveau projet" ────────────────────────── */}
+      <NewProjectChoiceModal
+        isOpen={isNewProjectChoiceOpen}
+        onClose={() => setIsNewProjectChoiceOpen(false)}
+        onChooseBrief={handleChooseBrief}
+        onChooseManual={handleChooseManual}
+      />
+
+      <BriefInputModal
+        isOpen={isBriefInputOpen}
+        onClose={() => !isBriefProcessing && setIsBriefInputOpen(false)}
+        onSubmit={handleSubmitBrief}
+        isProcessing={isBriefProcessing && isBriefInputOpen}
+      />
+
+      <BriefClarificationModal
+        isOpen={isBriefClarificationOpen}
+        questions={clarificationQuestions}
+        onClose={() => !isBriefProcessing && setIsBriefClarificationOpen(false)}
+        onSubmit={handleSubmitClarifications}
+        isProcessing={isBriefProcessing && isBriefClarificationOpen}
+        processingMessage={briefProcessingMessage}
       />
 
       {/* Import JSON Modal Preview & Confirmation */}

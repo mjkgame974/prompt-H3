@@ -26,7 +26,10 @@ import type { ProjectData } from "../types/minimax";
 import { compileMiniMaxH3Prompt } from "../utils/compiler";
 
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
-const DEFAULT_MODEL = "gemini-flash-latest";
+// Note : `gemini-flash-latest` pointe vers `gemini-3.7-flash` qui a un quota
+// gratuit de seulement 20 req/jour. `gemini-3.5-flash` a un quota séparé
+// et plus généreux, c'est notre défaut.
+const DEFAULT_MODEL = "gemini-3.5-flash";
 const REQUEST_TIMEOUT_MS = 30_000;
 
 export class GeminiError extends Error {
@@ -426,4 +429,674 @@ export async function pingGemini(apiKey: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Mode "Brief" : transformer un brief libre en projet H3 structuré
+// ---------------------------------------------------------------------------
+
+/**
+ * Helper : exécute un appel generateContent avec retry automatique sur
+ * 503/502/500 (Google est notoire pour renvoyer 503 temporaires).
+ * Les 401/403/429 (erreurs définitives) ne sont PAS retentés.
+ */
+async function generateContentWithRetry(
+  url: string,
+  apiKey: string,
+  body: unknown,
+  options: { maxRetries?: number; baseDelayMs?: number } = {},
+): Promise<Response> {
+  const { maxRetries = 2, baseDelayMs = 1500 } = options;
+  let lastResponse: Response | null = null;
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
+        body: JSON.stringify(body),
+      });
+
+      // Si réponse OK ou erreur définitive (4xx sauf 429), on retourne direct
+      if (res.ok) return res;
+      if (res.status >= 400 && res.status < 500 && res.status !== 429) {
+        return res;
+      }
+
+      // 503/502/500 ou 429 : on retente après un délai
+      lastResponse = res;
+      if (attempt < maxRetries) {
+        // Délai exponentiel : 1.5s, 3s, 6s...
+        const delay = baseDelayMs * Math.pow(2, attempt);
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    } catch (err) {
+      // Erreur réseau (DNS, connection lost, etc.)
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (attempt < maxRetries) {
+        const delay = baseDelayMs * Math.pow(2, attempt);
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+  }
+
+  if (lastResponse) return lastResponse;
+  throw lastError || new Error("Unknown error after retries");
+}
+
+/**
+ * Question de clarification posée à l'utilisateur après l'analyse du brief.
+ * On limite à 2-3 questions max, chacune avec 3-5 options concrètes.
+ * `allowSkip: true` ajoute une option "Choisis pour moi" en bout de liste.
+ */
+export interface ClarificationQuestion {
+  id: string;
+  question: string;
+  options: { value: string; label: string }[];
+  allowSkip: boolean;
+}
+
+export interface ClarificationAnswer {
+  questionId: string;
+  /** Valeur de l'option choisie, ou null si "Choisis pour moi" / passé. */
+  value: string | null;
+}
+
+const BRIEF_QUESTION_GENERATOR_SYSTEM = `Tu es un assistant de clarification pour MiniMax H3, un modèle de génération vidéo IA.
+
+On te donne un brief libre d'un utilisateur (description d'idée de vidéo). Tu dois identifier 2 ou 3 questions OBJECTIVES et CONCISES qui permettent de mieux structurer le brief en projet H3.
+
+Règles strictes :
+- Tu poses ENTRE 2 ET 3 questions MAXIMUM. Pas plus, pas moins.
+- Chaque question est FACTUELLE (pas subjective) et a 3 à 5 options CONCRÈTES.
+- Tu n'inventes PAS d'information que l'utilisateur n'a pas donnée : si le brief est trop vague sur un aspect (ex: format, durée, public), c'est justement pour ça que tu poses la question.
+- L'ID de chaque question doit être en kebab-case anglais (ex: "format", "duree", "public-cible", "ton").
+- Le champ "question" est en français, court et direct (max 8 mots).
+- Le champ "options" propose 3 à 5 choix courts, chacun avec un "value" (valeur technique, anglais) et un "label" (texte affiché en français, max 5 mots).
+- Le champ "allowSkip" est toujours true (l'utilisateur peut dire "Choisis pour moi").
+- Tu ne retournes RIEN d'autre que le JSON. Pas de markdown, pas de préambule.
+
+Exemples de BONNES questions :
+- {"id": "format", "question": "Format d'image cible ?", "options": [{"value": "16:9", "label": "16:9 (YouTube, web)"}, {"value": "9:16", "label": "9:16 (TikTok, Reels)"}, {"value": "1:1", "label": "1:1 (Instagram)"}], "allowSkip": true}
+- {"id": "duree", "question": "Durée de la vidéo ?", "options": [{"value": "5s", "label": "5s (format court)"}, {"value": "10s", "label": "10s (standard)"}, {"value": "15s", "label": "15s (étendu)"}, {"value": "30s", "label": "30s (premium)"}], "allowSkip": true}
+
+Format de sortie OBLIGATOIRE (et RIEN d'autre, JSON strict) :
+{
+  "questions": [
+    { "id": "...", "question": "...", "options": [...], "allowSkip": true }
+  ]
+}`;
+
+const BRIEF_TO_PROJECT_SYSTEM = `Tu es un directeur artistique expert en MiniMax H3 (modèle de génération vidéo IA).
+
+On te donne :
+1. Un brief libre de l'utilisateur (description de son idée de vidéo)
+2. Les réponses de l'utilisateur à 2-3 questions de clarification
+
+Tu dois transformer ce brief en un objet JSON STRICT conforme au schéma ProjectData de MiniMax H3, en remplissant intelligemment les champs à partir du brief.
+
+Règles strictes :
+- Tu ne renvoies QUE le JSON, rien d'autre. Pas de markdown, pas de préambule, pas d'explication.
+- Tu respectes SCRUPULEUSEMENT le schéma JSON fourni.
+- Pour les champs énumérés (videoType, videoGoal, aspectRatio, duration, framing, angle, motion, speed), tu utilises EXACTEMENT les valeurs autorisées (cf. schéma).
+- Tu NE INVENTES PAS d'information nouvelle : si le brief ne parle pas d'un aspect, tu mets une valeur par défaut raisonnable (cf. schéma).
+- Tu fais des CHOIX ARTISTIQUES cohérents : si l'utilisateur dit "publicité parfum luxe", tu choisis un style "luxe" pas "streetwear", une ambiance "élégance" pas "énergie brute", etc.
+- Pour shots : tu proposes 2-4 plans cohérents avec la durée (5s = 1-2 plans, 10s = 2-3 plans, 15s = 3-4 plans, 30s = 4-6 plans).
+- Pour cameraDirections : tu assignes un cadrage, angle, mouvement et vitesse par plan, en cohérence avec le story-telling.
+- Pour audioDesign : si isSilent=true, mets hasMusic=false, ambientSound="", etc.
+- Pour negativeConstraints : tu mets 3 à 5 items génériques toujours pertinents (no subtitles, no morphing defects, no watermarks, etc.).
+- Le title est un résumé court du brief (max 6 mots), tu le déduis du brief.
+
+Format de sortie : JSON strict valide conforme au schéma ci-dessous. Aucun texte autour.`;
+
+const PROJECT_DATA_JSON_SCHEMA = `{
+  "title": string,                    // ex: "Publicité Parfum Luxe"
+  "videoType": "pub_produit" | "court_metrage" | "animation_2d" | "trailer" | "doublage" | "edition_video" | "autre",
+  "videoGoal": "vendre" | "teaser" | "raconter" | "demonstrer" | "annoncer",
+  "emotion": string,                  // ex: "élégance, mystère, sensualité"
+  "aspectRatio": "16:9" | "9:16" | "1:1" | "4:3" | "21:9",
+  "duration": "5s" | "10s" | "15s" | "30s",
+  "styleContract": {
+    "medium": string,                 // ex: "Cinematic 4K"
+    "texture": string,                // ex: "hyper-detailed metallic gloss"
+    "palette": string,                // ex: "warm amber and deep black"
+    "era": string,                    // ex: "contemporary luxury"
+    "visualRendering": string,        // ex: "photorealistic commercial render"
+    "fps"?: string,                   // ex: "24 FPS" (optionnel)
+    "condensedEnglishSentence": string  // ex: "Cinematic 4K luxury perfume ad, golden light, slow camera orbit"
+  },
+  "shots": [
+    {
+      "id": string,                   // "shot_1", "shot_2", ...
+      "shotNumber": number,           // 1, 2, 3, ...
+      "timestamp"?: string,           // ex: "00:04.000" pour plan 2+
+      "visualDescription": string,    // ex: "Black velvet surface with golden light reflections"
+      "subjectAction": string,        // ex: "Slow camera dolly forward revealing the perfume bottle"
+      "atmosphere": string,           // ex: "Mysterious, elegant, intimate"
+      "transition"?: string           // ex: "Cut to next shot" (optionnel)
+    }
+  ],
+  "cameraDirections": {
+    "shot_1": {                       // clé = id du shot
+      "shotId": "shot_1",
+      "framing": "wide" | "medium" | "close_up" | "extreme_close_up" | "establishing",
+      "angle": "eye_level" | "low_angle" | "high_angle" | "birds_eye" | "dutch_angle",
+      "motion": "static" | "tracking_forward" | "tracking_backward" | "panning_left" | "panning_right" | "orbit" | "crane_up" | "crane_down" | "handheld" | "zoom_in" | "zoom_out",
+      "speed": "subtle" | "smooth" | "fast" | "dynamic"
+    }
+  },
+  "audioDesign": {
+    "isSilent": boolean,
+    "ambientSound": string,           // ex: "soft wind chimes, intimate atmosphere"
+    "keySFX": string,                 // ex: "subtle glass clink at 00:02.000"
+    "hasMusic": boolean,
+    "musicDescription": string,       // ex: "elegant piano with subtle string swells"
+    "hasVoiceoverOrDialogue": boolean,
+    "voiceType": "voiceover" | "dialogue" | "both" | "none",
+    "spokenLanguage": string,         // ex: "French"
+    "voiceTone": string               // ex: "féminine grave, sensuelle, posée"
+  },
+  "onScreenText": {
+    "hasText": boolean,
+    "exactString": string             // ex: "ESSENCE DE NUIT"
+  },
+  "spokenDialogue": {
+    "hasDialogue": boolean,
+    "languageCode": string,           // ex: "French"
+    "exactLines": string              // ex: "Découvrez l'élégance absolue."
+  },
+  "preservationRules": {
+    "elementsToPreserve": string,     // ex: "Conserver la géométrie du flacon, la couleur du verre et le logo doré"
+    "mistakesToAvoid": string         // ex: "Éviter les déformations du bouchon et les transitions floues"
+  },
+  "negativeConstraints": [
+    { "id": string, "text": string }  // 3 à 5 items, ex: "no subtitles", "no morphing defects", "no watermarks"
+  ]
+}`;
+
+/**
+ * Analyse un brief libre et génère 2-3 questions de clarification objectives.
+ * Renvoie un tableau de questions (toujours 2 ou 3 éléments).
+ */
+export async function analyzeBriefForQuestions(
+  brief: string,
+  apiKey: string,
+  model: string = DEFAULT_MODEL,
+): Promise<ClarificationQuestion[]> {
+  if (!brief.trim()) {
+    throw new GeminiError("Brief vide", "unknown");
+  }
+
+  const response = await generateContentWithRetry(
+    `${GEMINI_API_BASE}/models/${model}:generateContent`,
+    apiKey,
+    {
+      contents: [
+        { parts: [{ text: `Brief utilisateur :\n---\n${brief}\n---\n\nGénère 2-3 questions de clarification pertinentes.` }] },
+      ],
+      systemInstruction: { parts: [{ text: BRIEF_QUESTION_GENERATOR_SYSTEM }] },
+      generationConfig: {
+        temperature: 0.4,
+        topP: 0.9,
+        topK: 40,
+        maxOutputTokens: 1024,
+        // Force la sortie en JSON strict
+        responseMimeType: "application/json",
+        thinkingConfig: { thinkingBudget: 0 },
+      },
+    },
+    { maxRetries: 2, baseDelayMs: 1500 },
+  );
+
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const errBody = await response.json();
+      detail = errBody?.error?.message || "";
+    } catch { /* ignore */ }
+    if (response.status === 401 || response.status === 403) {
+      throw new GeminiError("Clé API invalide.", "invalid_key", response.status);
+    }
+    if (response.status === 429) {
+      throw new GeminiError("Quota Gemini dépassé.", "rate_limited", response.status);
+    }
+    throw new GeminiError(
+      `Erreur Gemini ${response.status}. ${detail}`.trim(),
+      "server_error",
+      response.status,
+    );
+  }
+
+  const data = await response.json();
+  const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!raw) {
+    throw new GeminiError("Gemini a renvoyé une réponse vide.", "server_error");
+  }
+
+  // Gemini peut wrapper le JSON dans du markdown ```json ... ``` ou ajouter
+  // du texte avant/après malgré responseMimeType. On extrait le bloc JSON
+  // de manière défensive.
+  const extracted = extractJsonBlock(raw);
+  let parsed: { questions?: ClarificationQuestion[] };
+  try {
+    parsed = JSON.parse(extracted);
+  } catch (err) {
+    throw new GeminiError(
+      `Gemini a renvoyé du JSON invalide : ${err instanceof Error ? err.message : ""}`,
+      "server_error",
+    );
+  }
+
+  const questions = parsed.questions;
+  if (!Array.isArray(questions) || questions.length === 0) {
+    throw new GeminiError("Gemini n'a généré aucune question.", "server_error");
+  }
+
+  // Filet de sécurité : on borne à 2-3 questions, on valide chaque option
+  return questions.slice(0, 3).map((q) => ({
+    id: String(q.id || "unknown"),
+    question: String(q.question || ""),
+    options: Array.isArray(q.options)
+      ? q.options
+          .filter((o) => o && typeof o.value === "string" && typeof o.label === "string")
+          .map((o) => ({ value: o.value, label: o.label }))
+      : [],
+    allowSkip: true, // toujours autoriser le skip
+  }));
+}
+
+/**
+ * Transforme un brief + les clarifications en un projet H3 partiel.
+ * Le retour couvre les champs principaux du wizard (étapes 1-8).
+ * L'étape 9 (génération prompt) reste calculée à la volée.
+ */
+export async function briefToProject(
+  brief: string,
+  clarifications: ClarificationAnswer[],
+  apiKey: string,
+  model: string = DEFAULT_MODEL,
+): Promise<Partial<ProjectData>> {
+  if (!brief.trim()) {
+    throw new GeminiError("Brief vide", "unknown");
+  }
+
+  // On sérialise les clarifications dans le user prompt
+  const clarifText = clarifications
+    .filter((c) => c.value !== null)
+    .map((c, i) => `${i + 1}. [${c.questionId}] → ${c.value}`)
+    .join("\n");
+
+  const userPrompt = `Brief utilisateur :
+---
+${brief}
+---
+
+Réponses aux questions de clarification :
+${clarifText || "(aucune, l'utilisateur a tout passé — choisis les valeurs par défaut les plus cohérentes avec le brief)"}
+
+Génère le JSON du projet H3 conforme au schéma. UNIQUEMENT le JSON, rien autour.`;
+
+  const response = await generateContentWithRetry(
+    `${GEMINI_API_BASE}/models/${model}:generateContent`,
+    apiKey,
+    {
+      contents: [{ parts: [{ text: userPrompt }] }],
+      systemInstruction: { parts: [{ text: BRIEF_TO_PROJECT_SYSTEM }] },
+      generationConfig: {
+        temperature: 0.5,
+        topP: 0.9,
+        topK: 40,
+        maxOutputTokens: 4096,
+        responseMimeType: "application/json",
+        thinkingConfig: { thinkingBudget: 0 },
+      },
+    },
+    { maxRetries: 2, baseDelayMs: 1500 },
+  );
+
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const errBody = await response.json();
+      detail = errBody?.error?.message || "";
+    } catch { /* ignore */ }
+    if (response.status === 401 || response.status === 403) {
+      throw new GeminiError("Clé API invalide.", "invalid_key", response.status);
+    }
+    if (response.status === 429) {
+      throw new GeminiError("Quota Gemini dépassé.", "rate_limited", response.status);
+    }
+    throw new GeminiError(
+      `Erreur Gemini ${response.status}. ${detail}`.trim(),
+      "server_error",
+      response.status,
+    );
+  }
+
+  const data = await response.json();
+  const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!raw) {
+    throw new GeminiError("Gemini a renvoyé une réponse vide.", "server_error");
+  }
+
+  let parsed: Partial<ProjectData>;
+  try {
+    parsed = JSON.parse(extractJsonBlock(raw));
+  } catch (err) {
+    throw new GeminiError(
+      `Gemini a renvoyé du JSON invalide : ${err instanceof Error ? err.message : ""}`,
+      "server_error",
+    );
+  }
+
+  // Normalisation : Gemini n'a pas toujours respecté le schéma. On mappe
+  // les synonymes, fixe les types, complète les champs manquants.
+  return normalizeBriefResult(parsed);
+}
+
+/**
+ * Extrait le bloc JSON principal d'une réponse Gemini brute.
+ * Gère les cas où Gemini wrappe dans ```json ... ```, ``` ... ```,
+ * ou ajoute du texte avant/après.
+ */
+function extractJsonBlock(raw: string): string {
+  // 1. Strip des fences markdown ```json ... ``` ou ``` ... ```
+  const fenceMatch = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  if (fenceMatch) return fenceMatch[1].trim();
+
+  // 2. Pas de fence : on cherche le premier { et le dernier } correspondant
+  const firstBrace = raw.indexOf("{");
+  if (firstBrace === -1) return raw; // pas de JSON visible, on tente brut
+
+  // On cherche le dernier } en respectant l'imbrication
+  let depth = 0;
+  let lastBrace = -1;
+  for (let i = firstBrace; i < raw.length; i++) {
+    if (raw[i] === "{") depth++;
+    else if (raw[i] === "}") {
+      depth--;
+      if (depth === 0) {
+        lastBrace = i;
+        break;
+      }
+    }
+  }
+
+  if (lastBrace === -1) return raw; // pas de fermeture, on tente brut
+  return raw.slice(firstBrace, lastBrace + 1);
+}
+
+// ---------------------------------------------------------------------------
+// Normalisation post-génération : robuste aux approximations de Gemini
+// ---------------------------------------------------------------------------
+
+const VIDEO_TYPE_SYNONYMS: Record<string, string> = {
+  commercial: "pub_produit",
+  pub: "pub_produit",
+  advertisement: "pub_produit",
+  ad: "pub_produit",
+  "publicité": "pub_produit",
+  "short film": "court_metrage",
+  "court-métrage": "court_metrage",
+  short: "court_metrage",
+  anime: "animation_2d",
+  "2d": "animation_2d",
+  "3d": "autre",
+  "motion design": "autre",
+  musicvideo: "autre",
+  "music video": "autre",
+  "clip": "autre",
+  teaser: "trailer",
+  trailer: "trailer",
+  "lip-sync": "doublage",
+  lipsync: "doublage",
+  editing: "edition_video",
+  "video editing": "edition_video",
+};
+
+const VIDEO_GOAL_SYNONYMS: Record<string, string> = {
+  branding: "vendre",
+  sell: "vendre",
+  sales: "vendre",
+  promote: "vendre",
+  promotion: "vendre",
+  "promouvoir": "vendre",
+  advertise: "vendre",
+  conversion: "vendre",
+  storytelling: "raconter",
+  story: "raconter",
+  narrate: "raconter",
+  "raconter": "raconter",
+  explain: "demonstrer",
+  demo: "demonstrer",
+  tutoriel: "demonstrer",
+  tutorial: "demonstrer",
+  howto: "demonstrer",
+  announce: "annoncer",
+  "annonce": "annoncer",
+  event: "annoncer",
+  hype: "teaser",
+  curiosity: "teaser",
+  "buzz": "teaser",
+};
+
+const ASPECT_RATIO_SYNONYMS: Record<string, string> = {
+  "16/9": "16:9",
+  "1920x1080": "16:9",
+  horizontal: "16:9",
+  paysage: "16:9",
+  landscape: "16:9",
+  youtube: "16:9",
+  web: "16:9",
+  "9/16": "9:16",
+  "1080x1920": "9:16",
+  vertical: "9:16",
+  portrait: "9:16",
+  tiktok: "9:16",
+  reels: "9:16",
+  shorts: "9:16",
+  "1/1": "1:1",
+  square: "1:1",
+  carre: "1:1",
+  instagram: "1:1",
+  "4/3": "4:3",
+  "21/9": "21:9",
+  ultrawide: "21:9",
+  cinema: "21:9",
+};
+
+const DURATION_SYNONYMS: Record<string, string> = {
+  "5": "5s",
+  "10": "10s",
+  "15": "15s",
+  "30": "30s",
+  "5s": "5s",
+  "10s": "10s",
+  "15s": "15s",
+  "30s": "30s",
+  "5 seconds": "5s",
+  "10 seconds": "10s",
+  "15 seconds": "15s",
+  "30 seconds": "30s",
+  court: "5s",
+  short: "5s",
+  medium: "10s",
+  long: "15s",
+  extended: "30s",
+};
+
+const FRAMING_SYNONYMS: Record<string, string> = {
+  ws: "wide",
+  ms: "medium",
+  cu: "close_up",
+  ecu: "extreme_close_up",
+  est: "establishing",
+  "establishing shot": "establishing",
+};
+
+const ANGLE_SYNONYMS: Record<string, string> = {
+  eye: "eye_level",
+  "eye level": "eye_level",
+  normal: "eye_level",
+  low: "low_angle",
+  high: "high_angle",
+  overhead: "birds_eye",
+  aerial: "birds_eye",
+  drone: "birds_eye",
+  dutch: "dutch_angle",
+  tilt: "dutch_angle",
+};
+
+const MOTION_SYNONYMS: Record<string, string> = {
+  still: "static",
+  none: "static",
+  fixed: "static",
+  dolly: "tracking_forward",
+  "dolly in": "tracking_forward",
+  "dolly out": "tracking_backward",
+  "dolly forward": "tracking_forward",
+  "dolly backward": "tracking_backward",
+  pan: "panning_right",
+  "pan left": "panning_left",
+  "pan right": "panning_right",
+  360: "orbit",
+  orbital: "orbit",
+  "crane up": "crane_up",
+  "crane down": "crane_down",
+  "hand held": "handheld",
+  "hand-held": "handheld",
+  shoulder: "handheld",
+  zoom: "zoom_in",
+};
+
+function normalizeEnum(
+  value: unknown,
+  synonyms: Record<string, string>,
+  fallback: string,
+): string {
+  if (typeof value !== "string") return fallback;
+  const lower = value.toLowerCase().trim();
+  if (synonyms[lower]) return synonyms[lower];
+  // Si la valeur est déjà valide (présente dans les valeurs du schéma), on la garde
+  if (Object.values(synonyms).includes(lower)) return lower;
+  return fallback;
+}
+
+function normalizeDuration(value: unknown, fallback: string): string {
+  if (typeof value === "number") {
+    const s = `${value}s`;
+    return DURATION_SYNONYMS[s] || fallback;
+  }
+  if (typeof value === "string") {
+    const lower = value.toLowerCase().trim();
+    if (DURATION_SYNONYMS[lower]) return DURATION_SYNONYMS[lower];
+    if (/^\d+$/.test(lower)) return DURATION_SYNONYMS[lower] || `${lower}s`;
+  }
+  return fallback;
+}
+
+function normalizeBriefResult(parsed: Partial<ProjectData>): Partial<ProjectData> {
+  const out: Partial<ProjectData> = { ...parsed };
+
+  // Champs énumérés
+  if (out.videoType !== undefined) {
+    out.videoType = normalizeEnum(out.videoType, VIDEO_TYPE_SYNONYMS, "autre") as ProjectData["videoType"];
+  }
+  if (out.videoGoal !== undefined) {
+    out.videoGoal = normalizeEnum(out.videoGoal, VIDEO_GOAL_SYNONYMS, "raconter") as ProjectData["videoGoal"];
+  }
+  if (out.aspectRatio !== undefined) {
+    out.aspectRatio = normalizeEnum(out.aspectRatio, ASPECT_RATIO_SYNONYMS, "16:9") as ProjectData["aspectRatio"];
+  }
+  if (out.duration !== undefined) {
+    out.duration = normalizeDuration(out.duration, "10s") as ProjectData["duration"];
+  }
+
+  // emotion : peut être manquant, on met un défaut
+  if (typeof out.emotion !== "string" || out.emotion.trim().length === 0) {
+    out.emotion = "élégance, raffinement";
+  }
+
+  // styleContract : peut être partiel ou absent, on garantit un objet complet
+  if (!out.styleContract || typeof out.styleContract !== "object") {
+    out.styleContract = {
+      medium: "Cinematic 4K",
+      texture: "smooth, premium",
+      palette: "warm amber and deep black",
+      era: "contemporary",
+      visualRendering: "photorealistic",
+      condensedEnglishSentence: "Cinematic 4K commercial with warm amber lighting, smooth premium texture, photorealistic render.",
+    };
+  } else {
+    const sc = out.styleContract;
+    if (typeof sc.medium !== "string" || !sc.medium.trim()) sc.medium = "Cinematic 4K";
+    if (typeof sc.texture !== "string" || !sc.texture.trim()) sc.texture = "smooth, premium";
+    if (typeof sc.palette !== "string" || !sc.palette.trim()) sc.palette = "warm amber and deep black";
+    if (typeof sc.era !== "string" || !sc.era.trim()) sc.era = "contemporary";
+    if (typeof sc.visualRendering !== "string" || !sc.visualRendering.trim()) sc.visualRendering = "photorealistic";
+    if (typeof sc.condensedEnglishSentence !== "string" || sc.condensedEnglishSentence.trim().length === 0) {
+      sc.condensedEnglishSentence = `${sc.medium} commercial, ${sc.palette}, ${sc.texture} texture, ${sc.visualRendering} render.`;
+    }
+  }
+
+  // shots : normaliser les champs et les ids
+  if (Array.isArray(out.shots)) {
+    out.shots = out.shots
+      .filter((s) => s && typeof s === "object")
+      .map((s, idx) => ({
+        ...s,
+        id: typeof s.id === "string" && s.id.length > 0 ? s.id : `shot_${idx + 1}`,
+        shotNumber: typeof s.shotNumber === "number" ? s.shotNumber : idx + 1,
+        // timestamps : seul le 1er plan n'en a pas
+        timestamp: idx === 0 ? undefined : s.timestamp,
+      }));
+  }
+
+  // cameraDirections : normaliser les valeurs enum
+  if (out.cameraDirections && typeof out.cameraDirections === "object") {
+    const normalizedCam: Record<string, unknown> = {};
+    for (const [key, dir] of Object.entries(out.cameraDirections)) {
+      if (!dir || typeof dir !== "object") continue;
+      normalizedCam[key] = {
+        ...dir,
+        framing: normalizeEnum((dir as { framing?: unknown }).framing, FRAMING_SYNONYMS, "medium"),
+        angle: normalizeEnum((dir as { angle?: unknown }).angle, ANGLE_SYNONYMS, "eye_level"),
+        motion: normalizeEnum((dir as { motion?: unknown }).motion, MOTION_SYNONYMS, "static"),
+        speed: normalizeEnum((dir as { speed?: unknown }).speed, { subtle: "subtle", smooth: "smooth", lente: "subtle", lent: "subtle", rapide: "fast", "fast": "fast", dynamic: "dynamic" }, "subtle"),
+      };
+    }
+    out.cameraDirections = normalizedCam as ProjectData["cameraDirections"];
+  }
+
+  // negativeConstraints : filtrer les items vides
+  if (Array.isArray(out.negativeConstraints)) {
+    out.negativeConstraints = out.negativeConstraints
+      .filter((n) => n && typeof n === "object" && typeof n.text === "string" && n.text.trim().length > 0)
+      .map((n, idx) => ({
+        id: typeof n.id === "string" && n.id.length > 0 ? n.id : `neg_${idx + 1}`,
+        text: n.text.trim(),
+      }));
+
+    // Si moins de 3 items, on complète avec des défauts génériques
+    const defaults = [
+      "no subtitles",
+      "no soft dissolves",
+      "no lens flares",
+      "no morphing defects",
+      "no watermarks",
+    ];
+    let di = 0;
+    while (out.negativeConstraints.length < 3 && di < defaults.length) {
+      const text = defaults[di++];
+      if (!out.negativeConstraints.some((n) => n.text === text)) {
+        out.negativeConstraints.push({ id: `neg_default_${di}`, text });
+      }
+    }
+  }
+
+  return out;
 }
