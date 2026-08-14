@@ -603,10 +603,19 @@ export default function App() {
           </div>
         )}
 
-        {/* Grid Split: Left 7 Cols (Form Wizard), Right 5 Cols (Live Preview) */}
+        {/* Grid Split: Left 7 Cols (Form Wizard), Right 5 Cols (Live Preview).
+            Sur l'Étape 9, on cache le LivePreview et on prend toute la largeur
+            pour que les 2 panneaux FR/EN soient bien aérés. */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Left Column: Interactive Form Step (7 cols) */}
-          <section className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 lg:p-10 shadow-xl relative min-h-[600px] flex flex-col justify-between max-w-3xl mx-auto w-full">
+          {/* Left Column: Interactive Form Step.
+              Step 9 = pleine largeur (le LivePreview est masqué). */}
+          <section
+            className={
+              project.step === 9
+                ? "lg:col-span-12 bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 lg:p-10 shadow-xl relative min-h-[600px] flex flex-col justify-between w-full"
+                : "lg:col-span-7 bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 lg:p-10 shadow-xl relative min-h-[600px] flex flex-col justify-between max-w-3xl mx-auto w-full"
+            }
+          >
             <div className="space-y-6 pt-2 lg:pt-4">
               {project.step === 1 && (
                 <Step1Objective project={project} onChange={updateProject} />
@@ -704,17 +713,21 @@ export default function App() {
             </div>
           </section>
 
-          {/* Right Column: Live Prompt Preview Panel (5 cols on desktop, sticky) */}
-          <section className="lg:col-span-5 lg:sticky lg:top-20">
-            <LivePromptPreview
-              project={project}
-              issues={issues}
-              onOptimizeWithAi={handleOptimizeWithAi}
-              isOptimizing={isOptimizing}
-              aiSuggestions={aiSuggestions}
-              streamingText={streamingText}
-            />
-          </section>
+          {/* Right Column: Live Prompt Preview Panel (5 cols on desktop, sticky).
+              Sur l'Étape 9 on le masque : les panneaux FR/EN intégrés au Step 9
+              prennent déjà toute la place et affichent les prompts. */}
+          {project.step !== 9 && (
+            <section className="lg:col-span-5 lg:sticky lg:top-20">
+              <LivePromptPreview
+                project={project}
+                issues={issues}
+                onOptimizeWithAi={handleOptimizeWithAi}
+                isOptimizing={isOptimizing}
+                aiSuggestions={aiSuggestions}
+                streamingText={streamingText}
+              />
+            </section>
+          )}
         </div>
       </main>
 

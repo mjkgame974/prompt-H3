@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   RefreshCw,
   Eye,
+  ArrowRight,
 } from "lucide-react";
 import { ProjectData, ValidationIssue } from "../../types/minimax";
 import { WizardContextBox } from "../WizardContextBox";
@@ -191,21 +192,35 @@ export const Step9Generation: React.FC<Step9GenerationProps> = ({
         </div>
       </div>
 
-      {/* Default tab: side-by-side French + English */}
+      {/* Default tab: side-by-side French + English — clairement distingués */}
       {activeTab === "mixte" && (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* ── French pane (read-only, blue) ── */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-blue-300 uppercase tracking-wider flex items-center space-x-1.5">
-                  <span>🇫🇷</span>
-                  <span>Version Française (lecture)</span>
-                </label>
+          {/* Bandeau d'aide compact en haut */}
+          <div className="flex items-center justify-center space-x-3 py-2 px-4 bg-slate-950/50 border border-slate-800 rounded-xl text-xs text-slate-400">
+            <span className="font-semibold text-blue-300">🇫🇷 Lis</span>
+            <ArrowRight className="w-3.5 h-3.5 text-slate-600" />
+            <span className="font-semibold text-amber-300">🇬🇧 Copie-colle dans MiniMax H3</span>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* ── French pane (read-only, BLEU) ─────────────────────── */}
+            <div className="rounded-2xl border-2 border-blue-500/40 bg-blue-950/20 overflow-hidden flex flex-col">
+              <div className="p-4 bg-blue-500/10 border-b border-blue-500/30 flex items-center justify-between">
+                <div className="flex items-center space-x-2.5">
+                  <span className="text-2xl">🇫🇷</span>
+                  <div>
+                    <h4 className="font-bold text-sm text-blue-200">
+                      Version Française
+                    </h4>
+                    <p className="text-[10px] text-blue-400/80 uppercase tracking-wider font-semibold">
+                      Lecture · Vérification
+                    </p>
+                  </div>
+                </div>
                 <button
                   type="button"
                   onClick={handleCopyFr}
-                  className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white shadow-md shadow-blue-500/20 transition active:scale-95"
+                  className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white shadow-md shadow-blue-500/30 transition active:scale-95"
                 >
                   {copiedFr ? (
                     <>
@@ -220,22 +235,29 @@ export const Step9Generation: React.FC<Step9GenerationProps> = ({
                   )}
                 </button>
               </div>
-              <div className="p-5 bg-slate-950 border border-blue-500/30 rounded-2xl font-sans text-sm text-slate-100 whitespace-pre-wrap leading-relaxed select-all max-h-[640px] overflow-y-auto">
+              <div className="p-5 font-sans text-sm text-slate-100 whitespace-pre-wrap leading-relaxed select-all max-h-[600px] overflow-y-auto bg-slate-950/40">
                 {frenchPrompt}
               </div>
             </div>
 
-            {/* ── English pane (H3 spec, copy this, amber) ── */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center space-x-1.5">
-                  <span>🇬🇧</span>
-                  <span>Version Anglaise H3 (copier-coller)</span>
-                </label>
+            {/* ── English pane (H3 spec, copy this, AMBRE) ──────────── */}
+            <div className="rounded-2xl border-2 border-amber-500/40 bg-amber-950/20 overflow-hidden flex flex-col">
+              <div className="p-4 bg-amber-500/10 border-b border-amber-500/30 flex items-center justify-between">
+                <div className="flex items-center space-x-2.5">
+                  <span className="text-2xl">🇬🇧</span>
+                  <div>
+                    <h4 className="font-bold text-sm text-amber-200">
+                      Version Anglaise H3
+                    </h4>
+                    <p className="text-[10px] text-amber-400/80 uppercase tracking-wider font-semibold">
+                      Copier-coller dans MiniMax H3
+                    </p>
+                  </div>
+                </div>
                 <button
                   type="button"
                   onClick={handleCopyFull}
-                  className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-md shadow-amber-500/20 transition active:scale-95"
+                  className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-md shadow-amber-500/30 transition active:scale-95"
                 >
                   {copiedFull ? (
                     <>
@@ -250,22 +272,22 @@ export const Step9Generation: React.FC<Step9GenerationProps> = ({
                   )}
                 </button>
               </div>
-              <div className="p-5 bg-slate-950 border border-amber-500/30 rounded-2xl font-mono text-xs text-slate-100 whitespace-pre-wrap leading-relaxed select-all max-h-[640px] overflow-y-auto">
+              <div className="p-5 font-mono text-xs text-slate-100 whitespace-pre-wrap leading-relaxed select-all max-h-[600px] overflow-y-auto bg-slate-950/40">
                 {fullPrompt}
               </div>
             </div>
           </div>
 
-          {/* Helper banner */}
-          <div className="p-4 bg-blue-950/30 border border-blue-800/50 rounded-xl text-xs text-blue-200 leading-relaxed">
-            <strong>💡 Mode d'emploi :</strong> lis la colonne de gauche pour vérifier ton intention
-            (en français, c'est ton texte). Une fois satisfait, clique sur <span className="font-bold">« Copier EN »</span> à
-            droite pour récupérer la version formatée H3, prête à coller dans MiniMax H3.
-            <br />
-            <span className="text-[10px] text-slate-400 italic">
-              Note : le dictionnaire de traduction FR→EN intégré est limité. Pour une traduction
-              complète de tes champs en français vers l'anglais H3, on peut brancher Gemini (reporté).
-            </span>
+          {/* Note d'aide sur la traduction */}
+          <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl text-[11px] text-slate-400 leading-relaxed">
+            <strong className="text-slate-200">💡 À savoir :</strong> la version
+            anglaise conserve la <em>structure technique H3</em> (timestamps,
+            blocs, contraintes négatives) et traduit les termes ciné
+            (cadrage, mouvement, etc.). Les <em>descriptions que tu as
+            saisies en français</em> restent en français dans la version
+            anglaise — c'est normal. Si tu veux une traduction complète
+            FR→EN, optimise avec Gemini ci-dessus : il enrichit la version
+            anglaise en anglais fluide.
           </div>
         </div>
       )}
